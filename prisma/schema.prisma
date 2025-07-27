@@ -1,0 +1,221 @@
+generator client {
+  provider = "prisma-client-js"
+    output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String             @id @default(cuid())
+  email             String             @unique
+  password          String
+  firstName         String
+  lastName          String
+  employeeId        String             @unique
+  department        String
+  position          String
+  role              Role               @default(EMPLOYEE)
+  phone             String?
+  address           String?
+  emergencyContact  String?
+  joinDate          DateTime           @default(now())
+  salary            Float?
+  isActive          Boolean            @default(true)
+   annualLeaveBalance Int    @default(30)
+  sickLeaveBalance   Int    @default(15)
+  casualLeaveBalance Int    @default(10)
+  profileImage      String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  attendanceRecords AttendanceRecord[]
+  leaveRequests     LeaveRequest[]
+  salaryRecords     SalaryRecord[]
+  lateApprovalRequests LateApprovalRequest[]
+  approvedLateRequests LateApprovalRequest[] @relation("ApprovedBy")
+
+  @@map("users")
+}
+
+model AttendanceRecord {
+  id               String           @id @default(cuid())
+  userId           String
+  date             DateTime
+  checkInTime      DateTime?
+  checkOutTime     DateTime?
+  breakStartTime   DateTime?
+  breakEndTime     DateTime?
+  totalHours       Float?
+  status           AttendanceStatus @default(PRESENT)
+  checkInLocation  String?
+  checkOutLocation String?
+  checkInMethod    CheckInMethod    @default(MANUAL)
+  checkOutMethod   CheckInMethod    @default(MANUAL)
+  notes            String?
+  isLate           Boolean          @default(false)
+  isEarlyLeave     Boolean          @default(false)
+  markedBy         String?
+  isManualEntry    Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("attendance_records")
+}
+
+model LeaveRequest {
+  id              String             @id @default(cuid())
+  userId          String
+  leaveType       LeaveType
+  startDate       DateTime
+  endDate         DateTime
+  totalDays       Int
+  reason          String
+  status          LeaveRequestStatus @default(PENDING)
+  isInformed      Boolean            @default(true)
+  leaveCategory   String             @default("REGULAR")
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?
+  documents       String[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("leave_requests")
+}
+
+model LateApprovalRequest {
+  id              String    @id @default(cuid())
+  userId          String
+  date            DateTime
+  lateMinutes     Int
+  reason          String
+  status          String    @default("PENDING")
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  approver        User?     @relation("ApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+
+  @@unique([userId, date])
+  @@map("late_approval_requests")
+}
+
+model SalaryRecord {
+  id                        String       @id @default(cuid())
+  userId                    String
+  month                     Int
+  year                      Int
+  baseSalary                Float
+  overtimePay               Float        @default(0)
+  bonuses                   Float        @default(0)
+  deductions                Float        @default(0)
+  lateDeductions            Float        @default(0)
+  leaveDeductions           Float        @default(0)
+  weekendDeductions         Float        @default(0)
+  uninformedLeaveDeductions Float        @default(0)
+  totalSalary               Float
+  workingDays               Int
+  presentDays               Int
+  absentDays                Int          @default(0)
+  leaveDays                 Int          @default(0)
+  lateCount                 Int          @default(0)
+  totalLateMinutes          Float        @default(0)
+  overtimeHours             Float        @default(0)
+  isPaid                    Boolean      @default(false)
+  paidAt                    DateTime?
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
+  user                      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month, year])
+  @@map("salary_records")
+}
+
+model SystemSettings {
+  id                   String     @id @default(cuid())
+  workingHoursStart    String     @default("09:00")
+  workingHoursEnd      String     @default("17:00")
+  lateThreshold        Int        @default(0)
+  overtimeThreshold    Float      @default(0)
+  lateDeductionRate    Float      @default(100.0)
+  leaveDeductionRate   Float      @default(100.0)
+  autoDeductLateArrival Boolean   @default(true)
+  autoDeductLeave      Boolean    @default(true)
+  weekendDays          String[]   @default(["SUNDAY"])
+  holidayDates         DateTime[]
+  companyName          String     @default("Ruba Agencies")
+  companyAddress       String?
+  companyPhone         String?
+  companyEmail         String?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@map("system_settings")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String?
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@map("notifications")
+}
+
+enum Role {
+  ADMIN
+  HR
+  MANAGER
+  EMPLOYEE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  HOLIDAY
+}
+
+enum CheckInMethod {
+  MANUAL
+  FACE_RECOGNITION
+  GEOLOCATION
+  ADMIN_MARKED
+}
+
+enum LeaveType {
+  SICK
+  CASUAL
+  ANNUAL
+  MATERNITY
+  PATERNITY
+  EMERGENCY
+  UNPAID
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
