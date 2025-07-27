@@ -87,7 +87,7 @@ export default function RootLayout({
       >
         <AuthProvider>
           {children}
-          <PWAInstallButton />
+      
           <Toaster />
           <PWAInstallPrompt /> {/* Fixed: Now used as standalone component */}
         </AuthProvider>

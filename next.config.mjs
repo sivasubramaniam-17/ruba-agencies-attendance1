@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-import nextPWA from "next-pwa";
+import nextPWA from "@ducanh2912/next-pwa";
 
 const withPWA = nextPWA({
   dest: "public",
@@ -42,7 +42,7 @@ runtimeCaching: [
   }
 ],
   buildExcludes: [/middleware-manifest\.json$/],
-  disable: process.env.NODE_ENV === "development",
+  disable: false,
 });
 
 const nextConfig = {
