@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
           checkOutLocation: location,
           checkOutMethod: method,
           totalHours: Math.round(totalHours * 100) / 100,
-          overtimeHours: Math.round(overtimeHours * 100) / 100,
+      
           isEarlyLeave,
         },
       })

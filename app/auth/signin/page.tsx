@@ -48,13 +48,15 @@ export default function SignInPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-50 via-white to-violet-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
-          <div className="flex items-center justify-center mb-4">
-            <div className="p-3 bg-violet-600 rounded-full">
-              <Building2 className="h-8 w-8 text-white" />
-            </div>
+          <div className="flex items-center justify-center mb-1">
+            <img src="/logo.png" alt="logo" className="h-20 w-20" />
           </div>
-          <CardTitle className="text-2xl font-bold text-gray-900">Ruba Agencies</CardTitle>
-          <CardDescription className="text-gray-600">Attendance Management System</CardDescription>
+          <CardTitle className="text-2xl font-bold text-gray-900">
+            Ruba Agencies
+          </CardTitle>
+          <CardDescription className="text-gray-600">
+            Attendance Management System
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -96,28 +98,27 @@ export default function SignInPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                  className="absolute right-0 top-0 text-gray-400 hover:text-gray-600 md:right-3 sm:top-3"
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
                 </button>
               </div>
             </div>
 
-            <Button type="submit" className="w-full bg-violet-600 hover:bg-violet-700" disabled={isLoading}>
+            <Button
+              type="submit"
+              className="w-full bg-violet-600 hover:bg-violet-700"
+              disabled={isLoading}
+            >
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
-
-          <div className="mt-6 text-center text-sm text-gray-600">
-            <p>Demo Credentials:</p>
-            <p className="font-mono text-xs bg-gray-100 p-2 rounded mt-2">
-              Email: admin@rubaagencies.com
-              <br />
-              Password: password
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

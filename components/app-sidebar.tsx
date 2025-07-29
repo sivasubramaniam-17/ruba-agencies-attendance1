@@ -142,10 +142,11 @@ export function AppSidebar() {
   return (
     <Sidebar variant="inset" className="border-r border-violet-200">
       <SidebarHeader className="border-b border-violet-100 bg-gradient-to-r from-violet-50 to-purple-50">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-purple-600 text-white font-bold">
-            <Building2 className="h-6 w-6" />
-          </div>
+        <div className="flex items-center gap-1 px-2 py-3">
+          {/* <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-purple-600 text-white font-bold">
+           <img src="logo.png" alt=""  className="h-10 w-10"/>
+          </div> */}
+           <img src="/logo.png" alt=""  className="h-16 w-16"/>
           <div>
             <h2 className="text-lg font-bold text-violet-900">Ruba Agencies</h2>
             <p className="text-sm text-violet-600">Attendance System</p>

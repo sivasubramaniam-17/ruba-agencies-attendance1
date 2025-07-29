@@ -7,6 +7,7 @@ interface SalaryCalculation {
   presentDays: number;
   absentDays: number; // Days with no record and no leave
   leaveDays: number; // Days with approved leave
+  rejectedLeaveDays: number; // Days with rejected leave
   lateCount: number;
   totalLateMinutes: number;
   lateDeductions: number;
@@ -50,7 +51,7 @@ export async function calculateSalary(
   const endDate = new Date(year, month, 0);
 
   // Get all necessary data in parallel
-  const [attendanceRecords, leaveRequests] = await Promise.all([
+  const [attendanceRecords, approvedLeaveRequests, rejectedLeaveRequests] = await Promise.all([
     prisma.attendanceRecord.findMany({
       where: {
         userId,
@@ -72,12 +73,25 @@ export async function calculateSalary(
         ],
       },
     }),
+    prisma.leaveRequest.findMany({
+      where: {
+        userId,
+        status: "REJECTED",
+        OR: [
+          {
+            startDate: { lte: endDate },
+            endDate: { gte: startDate },
+          },
+        ],
+      },
+    }),
   ]);
 
   // Initialize counters
   let presentDays = 0;
   let absentDays = 0;
   let leaveDays = 0;
+  let rejectedLeaveDays = 0;
   let lateCount = 0;
   let totalLateMinutes = 0;
   let consecutiveLeaveDays = 0;
@@ -92,7 +106,12 @@ export async function calculateSalary(
     const attendance = attendanceRecords.find(
       (record) => record.date.toISOString().split("T")[0] === dateStr
     );
-    const leave = leaveRequests.find(
+    const approvedLeave = approvedLeaveRequests.find(
+      (l) =>
+        currentDate >= new Date(l.startDate) &&
+        currentDate <= new Date(l.endDate)
+    );
+    const rejectedLeave = rejectedLeaveRequests.find(
       (l) =>
         currentDate >= new Date(l.startDate) &&
         currentDate <= new Date(l.endDate)
@@ -101,7 +120,7 @@ export async function calculateSalary(
     // Skip Sundays - they are automatically non-working days with pay
     if (dayOfWeek === 0) {
       // Check if Sunday is part of a leave period (for consecutive leave calculation)
-      if (leave) {
+      if (approvedLeave) {
         consecutiveLeaveDays++;
         maxConsecutiveLeave = Math.max(
           maxConsecutiveLeave,
@@ -154,11 +173,16 @@ export async function calculateSalary(
           }
         }
       }
-    } else if (leave) {
-      // Approved leave
+    } else if (approvedLeave) {
+      // Approved leave - no deduction
       leaveDays++;
       consecutiveLeaveDays++;
       maxConsecutiveLeave = Math.max(maxConsecutiveLeave, consecutiveLeaveDays);
+    } else if (rejectedLeave) {
+      // Rejected leave - count as absent
+      rejectedLeaveDays++;
+      absentDays++;
+      consecutiveLeaveDays = 0;
     } else {
       // No attendance record and no leave - count as absent
       absentDays++;
@@ -168,10 +192,10 @@ export async function calculateSalary(
 
   // Calculate deductions
   const lateDeductions = totalLateMinutes * minuteRate;
-
-  // Calculate leave deductions with special weekend rules
+  const absentDeductions = absentDays * dailyRate;
+  
+  // Initialize leave deductions to 0 since approved leaves shouldn't reduce salary
   let leaveDeductions = 0;
-  let absentDeductions = absentDays * dailyRate;
 
   // Special rules for leave that spans weekends
   if (maxConsecutiveLeave > 0) {
@@ -182,10 +206,6 @@ export async function calculateSalary(
     // If leave spans Saturday-Sunday, deduct for both days
     else if (maxConsecutiveLeave >= 2) {
       leaveDeductions = maxConsecutiveLeave * dailyRate;
-    }
-    // Regular leave deduction (1 day)
-    else {
-      leaveDeductions = leaveDays * dailyRate;
     }
   }
 
@@ -198,6 +218,7 @@ export async function calculateSalary(
     presentDays,
     absentDays,
     leaveDays,
+    rejectedLeaveDays,
     lateCount,
     totalLateMinutes,
     lateDeductions,

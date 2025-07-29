@@ -118,8 +118,8 @@ export default function DashboardPage() {
             </p>
             {dashboardData?.systemSettings && (
               <p className="text-sm text-violet-500 mt-1">
-                Working Hours: {dashboardData.systemSettings.workingHoursStart || "09:00"} -{" "}
-                {dashboardData.systemSettings.workingHoursEnd || "17:00"}
+                Working Hours: {dashboardData.systemSettings.workingHoursStart || "10:00"} -{" "}
+                {dashboardData.systemSettings.workingHoursEnd || "18:00"}
               </p>
             )}
           </div>
@@ -191,7 +191,7 @@ export default function DashboardPage() {
                   <Clock className="h-4 w-4 text-violet-600" />
                   <div>
                     <div className="text-2xl font-bold text-violet-900">
-                      {dashboardData?.systemSettings?.workingHoursStart ?? "09:00"}
+                      {dashboardData?.systemSettings?.workingHoursStart ?? "10:00"}
                     </div>
                     <p className="text-xs text-violet-600">Work Start Time</p>
                   </div>
@@ -205,7 +205,7 @@ export default function DashboardPage() {
                   <Clock className="h-4 w-4 text-violet-600" />
                   <div>
                     <div className="text-2xl font-bold text-violet-900">
-                      {dashboardData?.systemSettings?.workingHoursEnd ?? "17:00"}
+                      {dashboardData?.systemSettings?.workingHoursEnd ?? "18:00"}
                     </div>
                     <p className="text-xs text-violet-600">Work End Time</p>
                   </div>
