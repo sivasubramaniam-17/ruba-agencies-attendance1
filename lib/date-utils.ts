@@ -133,15 +133,25 @@ export function isWeekend(date: Date, weekendDays: string[] = ['Sunday']): boole
   return weekendDays.includes(dayName)
 }
 
-export function getMonthDetails(year: number, month: number) {
+export function getMonthDetails(year: number, month: number): MonthDetails {
   const date = new Date(year, month - 1, 1)
   const monthName = date.toLocaleString('default', { month: 'long' })
   const totalDays = new Date(year, month, 0).getDate()
-  
+
+  // Count Sundays (non-working days) and derive working days (all days minus Sundays).
+  let sundays = 0
+  for (let day = 1; day <= totalDays; day++) {
+    if (new Date(year, month - 1, day).getDay() === 0) sundays++
+  }
+  const workingDays = getWorkingDaysInMonth(year, month, ['Sunday'])
+
   return {
-    monthName,
     year,
+    month,
+    monthName,
     totalDays,
+    workingDays,
+    sundays,
   }
 }
 

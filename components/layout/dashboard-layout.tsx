@@ -51,7 +51,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <AppSidebar />
       <SidebarInset>
         {/* Header */}
-        <header className="sticky top-0 z-40 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b border-violet-200 bg-white/95 backdrop-blur-sm px-3 sm:px-4 shadow-sm">
+        <header className="sticky top-0 z-40 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b border-violet-100 bg-white/70 backdrop-blur-xl px-3 sm:px-4 shadow-sm shadow-violet-500/5">
           <SidebarTrigger className="-ml-1 text-violet-600 hover:bg-violet-50 p-2 rounded-lg">
             <Menu className="h-5 w-5" />
           </SidebarTrigger>
@@ -86,18 +86,23 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Notifications */}
           <div className="ml-auto flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="relative hover:bg-violet-50 text-violet-600">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative rounded-full text-violet-600 hover:bg-violet-50"
+            >
               <Bell className="h-5 w-5" />
-              <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-xs text-white p-0 flex items-center justify-center">
-                3
-              </Badge>
+              <span className="absolute right-1.5 top-1.5 flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+              </span>
             </Button>
           </div>
-       
+
         </header>
 
         {/* Main content */}
-        <main className="flex-1 p-3 sm:p-4 lg:p-6 bg-gradient-to-br from-violet-50/30 to-purple-50/30 min-h-[calc(100vh-4rem)]">
+        <main className="flex-1 p-3 sm:p-4 lg:p-6 bg-gradient-to-br from-violet-50/40 via-white to-fuchsia-50/30 min-h-[calc(100vh-4rem)]">
           {children}
         </main>
       </SidebarInset>

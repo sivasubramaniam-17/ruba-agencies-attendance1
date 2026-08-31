@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
+import useSWR from "swr"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -10,6 +11,7 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Settings, Clock, DollarSign, Calendar, AlertTriangle, Save } from "lucide-react"
+import { PageHeader } from "@/components/page-header"
 import { useToast } from "@/hooks/use-toast"
 import { getUpcomingMonthsWorkingDays, calculateRates, calculateWorkingHours } from "@/lib/date-utils"
 
@@ -25,8 +27,6 @@ interface SystemSettings {
 }
 
 export function SystemSettings() {
-  const [settings, setSettings] = useState<SystemSettings | null>(null)
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
     workingHoursStart: "09:00",
@@ -37,38 +37,40 @@ export function SystemSettings() {
   })
   const { toast } = useToast()
 
-  useEffect(() => {
-    fetchSettings()
-  }, [])
+  // Load once; don't revalidate on focus so it never clobbers in-progress edits.
+  // mutate() is exposed as fetchSettings so save handlers can refresh.
+  const {
+    data,
+    isLoading: loading,
+    error,
+    mutate: fetchSettings,
+  } = useSWR<{ settings: SystemSettings | null }>("/api/admin/settings", {
+    revalidateOnFocus: false,
+  })
+  const settings = data?.settings ?? null
 
-  const fetchSettings = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch("/api/admin/settings")
-      if (response.ok) {
-        const data = await response.json()
-        if (data.settings) {
-          setSettings(data.settings)
-          setFormData({
-            workingHoursStart: data.settings.workingHoursStart,
-            workingHoursEnd: data.settings.workingHoursEnd,
-            lateThreshold: 0, // Always 0 - no grace period
-            autoDeductLateArrival: data.settings.autoDeductLateArrival ?? true,
-            autoDeductLeave: data.settings.autoDeductLeave ?? true,
-          })
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching settings:", error)
+  // Seed the editable form whenever fresh settings arrive (initial load / after save).
+  useEffect(() => {
+    if (data?.settings) {
+      setFormData({
+        workingHoursStart: data.settings.workingHoursStart,
+        workingHoursEnd: data.settings.workingHoursEnd,
+        lateThreshold: 0, // Always 0 - no grace period
+        autoDeductLateArrival: data.settings.autoDeductLateArrival ?? true,
+        autoDeductLeave: data.settings.autoDeductLeave ?? true,
+      })
+    }
+  }, [data])
+
+  useEffect(() => {
+    if (error) {
       toast({
         title: "Error",
         description: "Failed to load system settings",
         variant: "destructive",
       })
-    } finally {
-      setLoading(false)
     }
-  }
+  }, [error, toast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -87,8 +89,6 @@ export function SystemSettings() {
       })
 
       if (response.ok) {
-        const data = await response.json()
-        setSettings(data.settings)
         toast({
           title: "Success",
           description: "System settings updated successfully",
@@ -131,24 +131,21 @@ export function SystemSettings() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Settings className="h-8 w-8 text-violet-600" />
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight text-violet-900">System Settings</h2>
-            <p className="text-violet-600">Configure attendance and salary calculation settings</p>
-          </div>
-        </div>
-        <Button
-          onClick={handleSubmit}
-          disabled={saving}
-          className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
-        >
-          <Save className="mr-2 h-4 w-4" />
-          {saving ? "Saving..." : "Save Settings"}
-        </Button>
-      </div>
+      <PageHeader
+        title="System Settings"
+        subtitle="Configure attendance and salary calculation settings"
+        icon={Settings}
+        actions={
+          <Button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="bg-white font-semibold text-violet-700 shadow-sm hover:bg-violet-50 disabled:opacity-60"
+          >
+            <Save className="mr-2 h-4 w-4" />
+            {saving ? "Saving..." : "Save Settings"}
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Settings Form */}

@@ -186,3 +186,12 @@
     page-break-after: always;
   }
 }
+
+/* Pulse ring for live-location markers on the admin tracking map */
+@keyframes rubaPulse {
+  0% { transform: scale(1); opacity: 0.35; }
+  70% { transform: scale(2.4); opacity: 0; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+/* Leaflet popups/controls should sit above app chrome but below modals */
+.leaflet-container { z-index: 0; }

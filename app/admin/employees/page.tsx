@@ -1,7 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import { mutate } from "swr"
 import { useSession } from "next-auth/react"
+
+// Revalidate every cached employee-list request (any page/filter combination).
+const revalidateEmployees = () =>
+  mutate((key) => typeof key === "string" && key.startsWith("/api/admin/employees"))
 import { useRouter } from "next/navigation"
 import { EmployeeList } from "@/components/admin/employee-list"
 import { EmployeeForm } from "@/components/admin/employee-form"
@@ -82,8 +87,8 @@ export default function AdminEmployeesPage() {
           title: "Success",
           description: "Employee deactivated successfully",
         })
-        // Refresh the list
-        window.location.reload()
+        // Refresh the list in place (no full page reload)
+        revalidateEmployees()
       } else {
         const error = await response.json()
         toast({
@@ -122,8 +127,8 @@ export default function AdminEmployeesPage() {
         })
         setShowForm(false)
         setEditingEmployee(null)
-        // Refresh the list
-        window.location.reload()
+        // Refresh the list in place (no full page reload)
+        revalidateEmployees()
       } else {
         const error = await response.json()
         toast({

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import useSWR from "swr"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -9,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Check, X, Clock, Filter, Eye } from "lucide-react"
+import { PageHeader } from "@/components/page-header"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
@@ -29,35 +31,21 @@ interface LateApprovalRequest {
 }
 
 export function LateApprovalManagement() {
-  const [requests, setRequests] = useState<LateApprovalRequest[]>([])
-  const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState("all")
   const [showRejectDialog, setShowRejectDialog] = useState(false)
   const [rejectingRequest, setRejectingRequest] = useState<LateApprovalRequest | null>(null)
   const [rejectionReason, setRejectionReason] = useState("")
   const { toast } = useToast()
 
-  useEffect(() => {
-    fetchRequests()
-  }, [statusFilter])
+  const params = new URLSearchParams()
+  if (statusFilter !== "all") params.append("status", statusFilter)
 
-  const fetchRequests = async () => {
-    try {
-      setLoading(true)
-      const params = new URLSearchParams()
-      if (statusFilter !== "all") params.append("status", statusFilter)
-
-      const response = await fetch(`/api/admin/late-approval?${params}`)
-      if (response.ok) {
-        const data = await response.json()
-        setRequests(data.requests)
-      }
-    } catch (error) {
-      console.error("Error fetching requests:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Key changes with the status filter, so SWR refetches automatically.
+  // mutate() is exposed as fetchRequests so approve/reject can revalidate.
+  const { data, isLoading: loading, mutate: fetchRequests } = useSWR<{
+    requests: LateApprovalRequest[]
+  }>(`/api/admin/late-approval?${params}`)
+  const requests = data?.requests ?? []
 
   const handleApprove = async (request: LateApprovalRequest) => {
     try {
@@ -147,13 +135,11 @@ export function LateApprovalManagement() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-orange-900">Late Arrival Approvals</h2>
-          <p className="text-orange-600">Review and approve employee late arrival requests</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Late Arrival Approvals"
+        subtitle="Review and approve employee late arrival requests"
+        icon={Clock}
+      />
 
       {/* Filters */}
       <Card className="border-orange-200">

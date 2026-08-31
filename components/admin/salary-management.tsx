@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Calculator, DollarSign, Users } from "lucide-react";
+import { PageHeader } from "@/components/page-header"
 import { useToast } from "@/hooks/use-toast";
 import { getMonthDetails, getCurrentMonthYear } from "@/lib/date-utils";
 
@@ -59,6 +60,9 @@ interface SalaryCalculation {
   totalLateMinutes: number;
   lateDeductions: number;
   leaveDeductions: number;
+  absentDeductions: number;
+  sandwichDays: number;
+  sandwichDeductions: number;
   totalDeductions: number;
   totalSalary: number;
   hourlyRate: number;
@@ -244,18 +248,11 @@ export function SalaryManagement() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <DollarSign className="h-8 w-8 text-green-600" />
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-green-900">
-            Salary Management
-          </h2>
-          <p className="text-green-600">
-            Calculate and manage employee salaries
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Salary Management"
+        subtitle="Calculate and manage employee salaries"
+        icon={DollarSign}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Salary Calculator */}
@@ -537,11 +534,27 @@ export function SalaryManagement() {
                       </span>
                     </div>
                     <div className="flex justify-between">
+                      <span className="text-red-800">Absent Deductions:</span>
+                      <span className="text-red-600">
+                        ₹{(calculation.absentDeductions ?? 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-red-800">Leave Deductions:</span>
                       <span className="text-red-600">
                         ₹{calculation.leaveDeductions.toFixed(2)}
                       </span>
                     </div>
+                    {(calculation.sandwichDays ?? 0) > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-red-800">
+                          Sunday Cut ({calculation.sandwichDays}):
+                        </span>
+                        <span className="text-red-600">
+                          ₹{(calculation.sandwichDeductions ?? 0).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between font-medium">
                       <span className="text-red-900">Total Deductions:</span>
                       <span className="text-red-700">

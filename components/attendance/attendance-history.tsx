@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import useSWR from "swr"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -26,37 +27,22 @@ interface AttendanceRecord {
 }
 
 export function AttendanceHistory() {
-  const [records, setRecords] = useState<AttendanceRecord[]>([])
-  const [loading, setLoading] = useState(true)
   const [dateRange, setDateRange] = useState({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0],
     to: new Date().toISOString().split("T")[0],
   })
 
-  useEffect(() => {
-    fetchAttendanceHistory()
-  }, [dateRange])
+  const params = new URLSearchParams({
+    startDate: new Date(dateRange.from).toISOString(),
+    endDate: new Date(dateRange.to).toISOString(),
+    limit: "50",
+  })
 
-  const fetchAttendanceHistory = async () => {
-    try {
-      setLoading(true)
-      const params = new URLSearchParams({
-        startDate: new Date(dateRange.from).toISOString(),
-        endDate: new Date(dateRange.to).toISOString(),
-        limit: "50",
-      })
-
-      const response = await fetch(`/api/attendance/history?${params}`)
-      if (response.ok) {
-        const data = await response.json()
-        setRecords(data.records || [])
-      }
-    } catch (error) {
-      console.error("Error fetching attendance history:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Key changes when the date range changes, so SWR refetches automatically.
+  const { data, isLoading: loading, mutate: fetchAttendanceHistory } = useSWR<{
+    records?: AttendanceRecord[]
+  }>(`/api/attendance/history?${params}`)
+  const records = data?.records || []
 
   const getStatusBadge = (status: string, isLate: boolean) => {
     if (status === "PRESENT") {

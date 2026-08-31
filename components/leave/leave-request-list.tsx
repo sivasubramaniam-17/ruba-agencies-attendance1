@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import useSWR from "swr"
 import {
   Table,
   TableBody,
@@ -25,26 +25,8 @@ interface LeaveRequest {
 }
 
 export function LeaveRequestList({ userId }: { userId: string }) {
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchLeaveRequests = async () => {
-      try {
-        const response = await fetch(`/api/leave`)
-        if (response.ok) {
-          const data = await response.json()
-          setLeaveRequests(data.leaveRequests || [])
-        }
-      } catch (error) {
-        console.error("Error fetching leave requests:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchLeaveRequests()
-  }, [userId])
+  const { data, isLoading: loading } = useSWR<{ leaveRequests?: LeaveRequest[] }>("/api/leave")
+  const leaveRequests = data?.leaveRequests || []
 
   const getStatusBadge = (status: string) => {
     switch (status) {

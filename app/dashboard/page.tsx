@@ -1,10 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import useSWR from "swr"
 import { useSession } from "next-auth/react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { DashboardStats } from "@/components/dashboard-stats"
 import { AttendanceClock } from "@/components/attendance-clock"
+import { LiveLocationToggle } from "@/components/live-location-toggle"
+import { AdminDashboard } from "@/components/admin/admin-dashboard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -55,8 +58,7 @@ interface DashboardData {
 
 export default function DashboardPage() {
   const { data: session } = useSession()
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { data: dashboardData, isLoading: loading } = useSWR<DashboardData>("/api/dashboard/stats")
   const [currentTime, setCurrentTime] = useState(new Date())
 
   useEffect(() => {
@@ -64,25 +66,8 @@ export default function DashboardPage() {
       setCurrentTime(new Date())
     }, 1000)
 
-    fetchDashboardData()
-
     return () => clearInterval(timer)
   }, [])
-
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch("/api/dashboard/stats")
-      if (response.ok) {
-        const data = await response.json()
-        setDashboardData(data)
-      }
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const isAdmin = session?.user?.role === "ADMIN"
 
@@ -100,6 +85,19 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
+      </DashboardLayout>
+    )
+  }
+
+  // Admins get the redesigned bento dashboard.
+  if (isAdmin) {
+    return (
+      <DashboardLayout>
+        <AdminDashboard
+          name={session?.user?.name?.split(" ")?.[0] || "Admin"}
+          currentTime={currentTime}
+          data={dashboardData}
+        />
       </DashboardLayout>
     )
   }
@@ -233,8 +231,9 @@ export default function DashboardPage() {
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Attendance Clock - For Employees */}
           {!isAdmin && (
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 space-y-6">
               <AttendanceClock />
+              <LiveLocationToggle />
             </div>
           )}
 

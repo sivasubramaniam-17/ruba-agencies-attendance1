@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import useSWR from "swr"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Bell, Clock, Calendar, Users, CheckCircle, AlertCircle, Info } from "lucide-react"
+import { PageHeader } from "@/components/page-header"
 import { format } from "date-fns"
 
 interface Notification {
@@ -18,30 +19,12 @@ interface Notification {
 }
 
 export function Notifications() {
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetchNotifications()
-    // Set up polling for real-time updates
-    const interval = setInterval(fetchNotifications, 30000) // Poll every 30 seconds
-    return () => clearInterval(interval)
-  }, [])
-
-  const fetchNotifications = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch("/api/notifications")
-      if (response.ok) {
-        const data = await response.json()
-        setNotifications(data.notifications)
-      }
-    } catch (error) {
-      console.error("Error fetching notifications:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Poll every 30s for real-time updates; SWR dedupes and caches across mounts.
+  const { data, isLoading: loading, mutate } = useSWR<{ notifications: Notification[] }>(
+    "/api/notifications",
+    { refreshInterval: 30000 },
+  )
+  const notifications = data?.notifications ?? []
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -74,22 +57,29 @@ export function Notifications() {
   }
 
   const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((notif) => ({ ...notif, read: true })))
+    // Optimistically mark all read in the SWR cache without refetching.
+    mutate(
+      { notifications: notifications.map((notif) => ({ ...notif, read: true })) },
+      { revalidate: false },
+    )
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Notifications</h2>
-          <p className="text-muted-foreground">Stay updated with real-time system activities</p>
-        </div>
-        <Button onClick={markAllAsRead} variant="outline">
-          <CheckCircle className="mr-2 h-4 w-4" />
-          Mark All as Read
-        </Button>
-      </div>
+      <PageHeader
+        title="Notifications"
+        subtitle="Stay updated with real-time system activities"
+        icon={Bell}
+        actions={
+          <Button
+            onClick={markAllAsRead}
+            className="bg-white font-semibold text-violet-700 shadow-sm hover:bg-violet-50"
+          >
+            <CheckCircle className="mr-2 h-4 w-4" />
+            Mark All as Read
+          </Button>
+        }
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

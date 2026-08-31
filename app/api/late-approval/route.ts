@@ -111,16 +111,17 @@ export async function POST(request: NextRequest) {
       where: {
         OR: [{ role: "ADMIN" }, { role: "HR" }],
       },
+      select: { id: true },
     })
 
-    for (const admin of admins) {
-      await prisma.notification.create({
-        data: {
+    if (admins.length > 0) {
+      await prisma.notification.createMany({
+        data: admins.map((admin) => ({
           userId: admin.id,
           title: "New Late Approval Request",
           message: `${user.firstName} ${user.lastName} has requested approval for being ${lateMinutes} minutes late on ${requestDate.toDateString()}.`,
-          type: "INFO",
-        },
+          type: "INFO" as const,
+        })),
       })
     }
 

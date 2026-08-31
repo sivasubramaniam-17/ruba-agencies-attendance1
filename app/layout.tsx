@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider";
+import { SWRProvider } from "@/components/swr-provider";
 import { Toaster } from "@/components/ui/toaster";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 import PWAInstallButton from "@/components/pwainstallbutton";
@@ -86,10 +87,12 @@ export default function RootLayout({
         className={`${inter.className} h-full bg-gradient-to-br from-violet-50 via-white to-purple-50`}
       >
         <AuthProvider>
-          {children}
-      
-          <Toaster />
-          <PWAInstallPrompt /> {/* Fixed: Now used as standalone component */}
+          <SWRProvider>
+            {children}
+
+            <Toaster />
+            <PWAInstallPrompt /> {/* Fixed: Now used as standalone component */}
+          </SWRProvider>
         </AuthProvider>
       </body>
     </html>

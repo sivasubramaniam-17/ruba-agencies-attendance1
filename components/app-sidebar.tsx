@@ -41,6 +41,7 @@ import {
   Bell,
   FileText,
   ChevronDown,
+  MapPin,
 } from "lucide-react"
 import { signOut } from "next-auth/react"
 import Link from "next/link"
@@ -107,6 +108,11 @@ const adminMenuItems = [
     icon: DollarSign,
   },
   {
+    title: "Live Tracking",
+    url: "/admin/live-tracking",
+    icon: MapPin,
+  },
+  {
     title: "Notifications",
     url: "/admin/notifications",
     icon: Bell,
@@ -167,7 +173,7 @@ export function AppSidebar() {
                     <Collapsible key={item.title} defaultOpen={item.items.some((subItem) => isActive(subItem.url))}>
                       <SidebarMenuItem>
                         <CollapsibleTrigger asChild>
-                          <SidebarMenuButton className="hover:bg-violet-50 hover:text-violet-900">
+                          <SidebarMenuButton className="my-0.5 rounded-xl font-medium text-gray-600 transition-all hover:bg-violet-50 hover:text-violet-900">
                             <item.icon className="h-4 w-4" />
                             <span>{item.title}</span>
                             <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
@@ -180,7 +186,7 @@ export function AppSidebar() {
                                 <SidebarMenuSubButton
                                   asChild
                                   isActive={isActive(subItem.url)}
-                                  className="hover:bg-violet-50 hover:text-violet-900 data-[active=true]:bg-violet-100 data-[active=true]:text-violet-900"
+                                  className="my-0.5 rounded-xl font-medium text-gray-600 transition-all hover:bg-violet-50 hover:text-violet-900 data-[active=true]:bg-gradient-to-r data-[active=true]:from-violet-600 data-[active=true]:to-fuchsia-600 data-[active=true]:text-white data-[active=true]:shadow-md data-[active=true]:shadow-violet-500/30 data-[active=true]:[&>svg]:text-white"
                                 >
                                   <Link href={subItem.url}>
                                     <span>{subItem.title}</span>
@@ -200,7 +206,7 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       asChild
                       isActive={isActive(item.url)}
-                      className="hover:bg-violet-50 hover:text-violet-900 data-[active=true]:bg-violet-100 data-[active=true]:text-violet-900"
+                      className="my-0.5 rounded-xl font-medium text-gray-600 transition-all hover:bg-violet-50 hover:text-violet-900 data-[active=true]:bg-gradient-to-r data-[active=true]:from-violet-600 data-[active=true]:to-fuchsia-600 data-[active=true]:text-white data-[active=true]:shadow-md data-[active=true]:shadow-violet-500/30 data-[active=true]:[&>svg]:text-white"
                     >
                       <Link href={item.url}>
                         <item.icon className="h-4 w-4" />

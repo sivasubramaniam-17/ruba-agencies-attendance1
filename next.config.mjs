@@ -42,7 +42,11 @@ runtimeCaching: [
   }
 ],
   buildExcludes: [/middleware-manifest\.json$/],
-  disable: false,
+  // Disable the service worker in development. In dev, next-pwa regenerates
+  // public/sw.js on every compile, which the watcher treats as a change and
+  // triggers another compile — an endless recompile loop that floods HMR
+  // requests (and the SW re-fetches each one). PWA still runs in production.
+  disable: process.env.NODE_ENV === "development",
 });
 
 const nextConfig = {

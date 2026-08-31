@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import useSWR from "swr"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -9,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Check, X, Filter, Eye } from "lucide-react"
+import { Check, X, Filter, Eye, FileText } from "lucide-react"
+import { PageHeader } from "@/components/page-header"
 import { format } from "date-fns"
 import { useToast } from "@/hooks/use-toast"
 
@@ -32,8 +34,6 @@ interface LeaveRequest {
 }
 
 export function LeaveManagement() {
-  const [requests, setRequests] = useState<LeaveRequest[]>([])
-  const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("")
   const [showRejectDialog, setShowRejectDialog] = useState(false)
@@ -41,29 +41,17 @@ export function LeaveManagement() {
   const [rejectionReason, setRejectionReason] = useState("")
   const { toast } = useToast()
 
-  useEffect(() => {
-    fetchLeaveRequests()
-  }, [statusFilter, departmentFilter])
+  const params = new URLSearchParams({
+    ...(statusFilter && { status: statusFilter }),
+    ...(departmentFilter && { department: departmentFilter }),
+  })
 
-  const fetchLeaveRequests = async () => {
-    try {
-      setLoading(true)
-      const params = new URLSearchParams({
-        ...(statusFilter && { status: statusFilter }),
-        ...(departmentFilter && { department: departmentFilter }),
-      })
-
-      const response = await fetch(`/api/admin/leaves?${params}`)
-      if (response.ok) {
-        const data = await response.json()
-        setRequests(data.requests)
-      }
-    } catch (error) {
-      console.error("Error fetching leave requests:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Key changes with filters, so SWR refetches automatically. mutate() is
+  // exposed as fetchLeaveRequests so approve/reject handlers can revalidate.
+  const { data, isLoading: loading, mutate: fetchLeaveRequests } = useSWR<{
+    requests: LeaveRequest[]
+  }>(`/api/admin/leaves?${params}`)
+  const requests = data?.requests ?? []
 
   const handleApprove = async (request: LeaveRequest) => {
     try {
@@ -166,13 +154,7 @@ export function LeaveManagement() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Leave Management</h2>
-          <p className="text-muted-foreground">Review and approve employee leave requests</p>
-        </div>
-      </div>
+      <PageHeader title="Leave Management" subtitle="Review and approve employee leave requests" icon={FileText} />
 
       {/* Filters */}
       <Card>

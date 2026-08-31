@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import useSWR from "swr"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -11,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { CalendarIcon, Download, Filter, BarChart3, Clock, Users, TrendingUp, Search } from "lucide-react"
+import { PageHeader } from "@/components/page-header"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 
@@ -42,9 +44,6 @@ interface AttendanceSummary {
 }
 
 export function AttendanceReports() {
-  const [records, setRecords] = useState<AttendanceRecord[]>([])
-  const [summary, setSummary] = useState<AttendanceSummary | null>(null)
-  const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
     startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     endDate: new Date(),
@@ -55,32 +54,20 @@ export function AttendanceReports() {
   const [showEndCalendar, setShowEndCalendar] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
 
-  useEffect(() => {
-    fetchAttendanceReports()
-  }, [filters])
+  const params = new URLSearchParams({
+    startDate: filters.startDate.toISOString(),
+    endDate: filters.endDate.toISOString(),
+    ...(filters.department && { department: filters.department }),
+    ...(filters.employeeId && { employeeId: filters.employeeId }),
+  })
 
-  const fetchAttendanceReports = async () => {
-    try {
-      setLoading(true)
-      const params = new URLSearchParams({
-        startDate: filters.startDate.toISOString(),
-        endDate: filters.endDate.toISOString(),
-        ...(filters.department && { department: filters.department }),
-        ...(filters.employeeId && { employeeId: filters.employeeId }),
-      })
-
-      const response = await fetch(`/api/admin/attendance?${params}`)
-      if (response.ok) {
-        const data = await response.json()
-        setRecords(data.records || [])
-        setSummary(data.summary || null)
-      }
-    } catch (error) {
-      console.error("Error fetching attendance reports:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Key changes with filters, so SWR refetches automatically.
+  const { data, isLoading: loading } = useSWR<{
+    records?: AttendanceRecord[]
+    summary?: AttendanceSummary | null
+  }>(`/api/admin/attendance?${params}`)
+  const records = data?.records || []
+  const summary = data?.summary || null
 
   const exportToCSV = () => {
     const headers = ["Date", "Employee ID", "Name", "Department", "Check In", "Check Out", "Total Hours", "Status"]
@@ -124,21 +111,21 @@ export function AttendanceReports() {
 
   return (
     <div className="space-y-4 sm:space-y-6 p-4 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-violet-900">Attendance Reports</h2>
-          <p className="text-violet-600">Comprehensive attendance analytics and reports</p>
-        </div>
-        <Button
-          onClick={exportToCSV}
-          disabled={records.length === 0}
-          className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-        >
-          <Download className="mr-2 h-4 w-4" />
-          Export CSV
-        </Button>
-      </div>
+      <PageHeader
+        title="Attendance Reports"
+        subtitle="Comprehensive attendance analytics and reports"
+        icon={BarChart3}
+        actions={
+          <Button
+            onClick={exportToCSV}
+            disabled={records.length === 0}
+            className="bg-white font-semibold text-violet-700 shadow-sm hover:bg-violet-50 disabled:opacity-60"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
+        }
+      />
 
       {/* Filters */}
       <Card className="border-violet-200 shadow-lg">

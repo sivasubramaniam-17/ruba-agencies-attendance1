@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Search, UserCheck, Clock, Save, Users, Calendar } from "lucide-react"
+import { PageHeader } from "@/components/page-header"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
@@ -163,17 +164,17 @@ export function MarkAttendance() {
 
   return (
     <div className="space-y-4 sm:space-y-6 p-4 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-violet-900">Mark Attendance</h2>
-          <p className="text-violet-600">Manually mark attendance for employees</p>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-violet-600">
-          <Users className="h-4 w-4" />
-          <span>{employees.length} Employees</span>
-        </div>
-      </div>
+      <PageHeader
+        title="Mark Attendance"
+        subtitle="Manually mark attendance for employees"
+        icon={UserCheck}
+        actions={
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium backdrop-blur">
+            <Users className="h-4 w-4" />
+            {employees.length} Employees
+          </span>
+        }
+      />
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Mark Attendance Form */}

@@ -72,20 +72,29 @@ export function AttendanceClock() {
   }
 
   const getCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords
-          setLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`)
-        },
-        (error) => {
-          console.error("Error getting location:", error)
-          setLocation("Location unavailable")
-        },
-      )
-    } else {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
       setLocation("Geolocation not supported")
+      return
     }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords
+        setLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`)
+      },
+      (error) => {
+        // GeolocationPositionError doesn't serialize well; map the code to a
+        // readable status. This is non-fatal — check-in still works without it.
+        const messages: Record<number, string> = {
+          1: "Location permission denied",
+          2: "Location unavailable",
+          3: "Location request timed out",
+        }
+        const label = messages[error?.code] || "Location unavailable"
+        console.warn(`Attendance location: ${label} (code ${error?.code ?? "?"}: ${error?.message ?? ""})`)
+        setLocation(label)
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
+    )
   }
 
   const handleAttendance = async (action: "checkin" | "checkout") => {

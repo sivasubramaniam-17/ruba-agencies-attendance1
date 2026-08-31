@@ -35,8 +35,26 @@ model User {
   salaryRecords     SalaryRecord[]
   lateApprovalRequests LateApprovalRequest[]
   approvedLateRequests LateApprovalRequest[] @relation("ApprovedBy")
+  locationPings        LocationPing[]
 
   @@map("users")
+}
+
+model LocationPing {
+  id        String   @id @default(cuid())
+  userId    String
+  latitude  Float
+  longitude Float
+  accuracy  Float?
+  heading   Float?
+  speed     Float?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Fast "latest ping per user" and "recent trail" lookups for the live map.
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("location_pings")
 }
 
 model AttendanceRecord {

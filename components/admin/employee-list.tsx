@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import useSWR from "swr"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -16,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Plus, MoreHorizontal, Edit, Trash2, Search, Filter, Users, UserCheck, UserX, Eye } from "lucide-react"
+import { PageHeader } from "@/components/page-header"
 import { format } from "date-fns"
 import { useToast } from "@/hooks/use-toast"
 
@@ -46,8 +48,6 @@ interface EmployeeListProps {
 }
 
 export function EmployeeList({ onAddEmployee, onEditEmployee, onViewEmployee, onDeleteEmployee }: EmployeeListProps) {
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [roleFilter, setRoleFilter] = useState("all")
@@ -59,40 +59,45 @@ export function EmployeeList({ onAddEmployee, onEditEmployee, onViewEmployee, on
   })
   const { toast } = useToast()
 
+  const params = new URLSearchParams({
+    page: pagination.page.toString(),
+    limit: pagination.limit.toString(),
+    ...(searchTerm && { search: searchTerm }),
+    ...(departmentFilter !== "all" && { department: departmentFilter }),
+    ...(roleFilter !== "all" && { role: roleFilter }),
+  })
+
+  // Key changes with page/filters, so SWR refetches automatically.
+  const {
+    data,
+    isLoading: loading,
+    error,
+    mutate: fetchEmployees,
+  } = useSWR<{ employees?: Employee[]; pagination?: typeof pagination }>(
+    `/api/admin/employees?${params}`,
+  )
+  const employees = data?.employees || []
+
   useEffect(() => {
-    fetchEmployees()
-  }, [pagination.page, searchTerm, departmentFilter, roleFilter])
-
-  const fetchEmployees = async () => {
-    try {
-      setLoading(true)
-      const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
-        ...(searchTerm && { search: searchTerm }),
-        ...(departmentFilter !== "all" && { department: departmentFilter }),
-        ...(roleFilter !== "all" && { role: roleFilter }),
-      })
-
-      const response = await fetch(`/api/admin/employees?${params}`)
-      if (response.ok) {
-        const data = await response.json()
-        setEmployees(data.employees || [])
-        setPagination(data.pagination || pagination)
-      } else {
-        throw new Error("Failed to fetch employees")
-      }
-    } catch (error) {
-      console.error("Error fetching employees:", error)
+    if (error) {
       toast({
         title: "Error",
         description: "Failed to fetch employees",
         variant: "destructive",
       })
-    } finally {
-      setLoading(false)
     }
-  }
+  }, [error, toast])
+
+  // Sync server-provided totals into pagination without affecting the fetch key.
+  useEffect(() => {
+    if (data?.pagination) {
+      setPagination((prev) => ({
+        ...prev,
+        total: data.pagination!.total,
+        pages: data.pagination!.pages,
+      }))
+    }
+  }, [data])
 
   const handleSearch = (value: string) => {
     setSearchTerm(value)
@@ -136,21 +141,21 @@ export function EmployeeList({ onAddEmployee, onEditEmployee, onViewEmployee, on
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        <div>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-violet-900">Employee Management</h2>
-          <p className="text-violet-600 mt-1">Manage employee records and information</p>
-        </div>
-        <Button
-          onClick={onAddEmployee}
-          className="w-full lg:w-auto bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
-          size="lg"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Employee
-        </Button>
-      </div>
+      <PageHeader
+        title="Employee Management"
+        subtitle="Manage employee records and information"
+        icon={Users}
+        actions={
+          <Button
+            onClick={onAddEmployee}
+            className="w-full bg-white font-semibold text-violet-700 shadow-sm hover:bg-violet-50 sm:w-auto"
+            size="lg"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Employee
+          </Button>
+        }
+      />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
