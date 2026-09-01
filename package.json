@@ -6,10 +6,17 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "cap:add": "cap add android",
+    "cap:sync": "cap sync",
+    "cap:android": "cap open android"
   },
   "dependencies": {
     "@auth/core": "latest",
+    "@capacitor-community/background-geolocation": "^1.2.26",
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/cli": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
     "@ducanh2912/next-pwa": "^10.2.9",
     "@hookform/resolvers": "^3.9.1",
     "@prisma/client": "latest",

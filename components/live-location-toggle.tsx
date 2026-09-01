@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { MapPin, Navigation, ShieldCheck } from "lucide-react"
+import { isNativeApp, startNativeTracking, stopNativeTracking } from "@/lib/native-tracking"
 
 // Post the device position at most this often while sharing.
 const POST_INTERVAL_MS = 10000
@@ -23,6 +24,32 @@ export function LiveLocationToggle() {
   const latestRef = useRef<GeolocationCoordinates | null>(null)
   const firstSentRef = useRef(false)
   const sharingRef = useRef(false)
+  const wakeLockRef = useRef<any>(null)
+
+  // Keep the screen awake while sharing so the browser doesn't suspend the tab
+  // when the phone is pocketed. This is the best a web app can do — it still
+  // stops if the app is closed/cleared (only a native app can track then).
+  const requestWakeLock = useCallback(async () => {
+    try {
+      if ("wakeLock" in navigator && !wakeLockRef.current) {
+        wakeLockRef.current = await (navigator as any).wakeLock.request("screen")
+        wakeLockRef.current.addEventListener?.("release", () => {
+          wakeLockRef.current = null
+        })
+      }
+    } catch {
+      // Wake Lock unsupported/denied — tracking still works while app is open.
+    }
+  }, [])
+
+  const releaseWakeLock = useCallback(() => {
+    try {
+      wakeLockRef.current?.release?.()
+    } catch {
+      /* ignore */
+    }
+    wakeLockRef.current = null
+  }, [])
 
   const sendPing = useCallback(async () => {
     const c = latestRef.current
@@ -46,6 +73,7 @@ export function LiveLocationToggle() {
   }, [])
 
   const stop = useCallback(() => {
+    if (isNativeApp()) stopNativeTracking()
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current)
       watchIdRef.current = null
@@ -56,11 +84,28 @@ export function LiveLocationToggle() {
     }
     latestRef.current = null
     firstSentRef.current = false
+    releaseWakeLock()
     setHasFix(false)
     setAccuracy(null)
-  }, [])
+  }, [releaseWakeLock])
 
   const start = useCallback(() => {
+    // In the native Android app, use the background foreground-service tracker so
+    // location keeps posting while the app is minimized / screen off.
+    if (isNativeApp()) {
+      setError(null)
+      sharingRef.current = true
+      startNativeTracking().then((ok) => {
+        if (ok) {
+          setHasFix(true)
+          setLastSentAt(new Date())
+        } else {
+          setError("Couldn't start background tracking. Please allow Location \"All the time\".")
+        }
+      })
+      return
+    }
+
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
       setError("Geolocation is not supported on this device.")
       setSharing(false)
@@ -69,6 +114,7 @@ export function LiveLocationToggle() {
     setError(null)
     firstSentRef.current = false
     sharingRef.current = true
+    requestWakeLock()
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
@@ -114,7 +160,7 @@ export function LiveLocationToggle() {
     )
 
     intervalRef.current = setInterval(sendPing, POST_INTERVAL_MS)
-  }, [sendPing, stop])
+  }, [sendPing, stop, requestWakeLock])
 
   const handleToggle = useCallback(
     (next: boolean) => {
@@ -147,6 +193,7 @@ export function LiveLocationToggle() {
   useEffect(() => {
     const recover = () => {
       if (!sharingRef.current || document.visibilityState !== "visible") return
+      requestWakeLock() // wake locks are dropped when hidden — re-acquire
       sendPing()
       if (!intervalRef.current) {
         intervalRef.current = setInterval(sendPing, POST_INTERVAL_MS)
@@ -158,7 +205,7 @@ export function LiveLocationToggle() {
       document.removeEventListener("visibilitychange", recover)
       window.removeEventListener("online", recover)
     }
-  }, [sendPing])
+  }, [sendPing, requestWakeLock])
 
   return (
     <Card className="border-violet-200 shadow-lg">
