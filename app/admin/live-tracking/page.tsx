@@ -27,10 +27,19 @@ export default function LiveTrackingPage() {
   const router = useRouter()
 
   // Poll the live feed every 8s; dedupe/caching handled by SWR.
+  const isAdminOrHr = session && (session.user.role === "ADMIN" || session.user.role === "HR")
   const { data, isLoading } = useSWR<{ employees: LiveEmployee[]; serverTime: string }>(
-    session && (session.user.role === "ADMIN" || session.user.role === "HR") ? "/api/location/live" : null,
+    isAdminOrHr ? "/api/location/live" : null,
     { refreshInterval: 25000, revalidateOnFocus: true },
   )
+
+  // Distance-travelled-today per employee (updates every 2 min — cheap).
+  const { data: statsData } = useSWR<{ distanceByUser: Record<string, number>; teamKm: number }>(
+    isAdminOrHr ? "/api/location/stats" : null,
+    { refreshInterval: 120000 },
+  )
+  const distanceByUser = statsData?.distanceByUser ?? {}
+  const teamKm = statsData?.teamKm ?? 0
 
   const employees = data?.employees ?? []
 
@@ -77,10 +86,15 @@ export default function LiveTrackingPage() {
               Employees currently sharing their location (updates every ~25s).
             </p>
           </div>
-          <Badge className="w-fit bg-green-100 text-green-700 hover:bg-green-100">
-            <span className="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-green-500" />
-            {employees.length} live now
-          </Badge>
+          <div className="flex w-fit flex-wrap items-center gap-2">
+            <Badge className="bg-violet-100 text-violet-700 hover:bg-violet-100">
+              🚶 {teamKm} km today
+            </Badge>
+            <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+              <span className="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-green-500" />
+              {employees.length} live now
+            </Badge>
+          </div>
         </div>
 
         {/* Status legend */}
@@ -149,6 +163,11 @@ export default function LiveTrackingPage() {
                           <MapPin className="mt-[1px] h-3 w-3 shrink-0 text-violet-500" />
                           <span className="truncate">{areas[e.user.id] || "Locating area…"}</span>
                         </p>
+                        {distanceByUser[e.user.id] != null && (
+                          <p className="mt-1 text-[11px] font-medium text-violet-700">
+                            🚶 {distanceByUser[e.user.id]} km travelled today
+                          </p>
+                        )}
                       </div>
                       <div className="shrink-0 text-right">
                         <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-green-500" />
