@@ -15,6 +15,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,3 +53,12 @@ jobs:
           name: ruba-attendance-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      # Publish to a fixed "app-latest" release so the in-app Download button has
+      # a stable public URL (.../releases/download/app-latest/app-debug.apk).
+      - name: Publish APK to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-latest
+          name: Ruba Attendance (latest)
+          files: android/app/build/outputs/apk/debug/app-debug.apk
