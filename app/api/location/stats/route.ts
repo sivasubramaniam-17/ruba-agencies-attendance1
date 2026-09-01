@@ -6,7 +6,7 @@ import { authOptions } from "@/lib/auth"
 // Distance a point can jump between fixes before we treat it as a GPS glitch.
 const MAX_SPEED_MPS = 55 // ~200 km/h
 // Movement below this (metres) is treated as GPS jitter, not real travel.
-const NOISE_FLOOR_M = 25
+const NOISE_FLOOR_M = 50
 // Ignore fixes worse than this accuracy (metres) — cell/wifi fixes are too noisy.
 const MAX_ACCURACY_M = 50
 
