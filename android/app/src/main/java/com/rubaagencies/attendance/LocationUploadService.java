@@ -169,6 +169,25 @@ public class LocationUploadService extends Service implements LocationListener {
                 .build();
     }
 
+    // Called when the user swipes the app away from recents. Immediately relaunch
+    // the service so tracking continues (works on most ROMs; MIUI still needs the
+    // app "locked" in recents to guarantee it).
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        try {
+            Intent restart = new Intent(getApplicationContext(), LocationUploadService.class);
+            restart.putExtra("url", url);
+            restart.putExtra("token", token);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                getApplicationContext().startForegroundService(restart);
+            } else {
+                getApplicationContext().startService(restart);
+            }
+        } catch (Exception ignored) {
+        }
+        super.onTaskRemoved(rootIntent);
+    }
+
     @Override
     public void onDestroy() {
         try {
