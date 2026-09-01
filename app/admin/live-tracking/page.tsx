@@ -26,17 +26,20 @@ export default function LiveTrackingPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
 
-  // Poll the live feed every 8s; dedupe/caching handled by SWR.
+  // Poll the live feed every 5s so the marker moves near-live (Google-Maps feel).
+  // SWR pauses this automatically when the tab is hidden, so the DB sleeps and we
+  // only spend while someone is actually watching. refreshWhenHidden stays off.
   const isAdminOrHr = session && (session.user.role === "ADMIN" || session.user.role === "HR")
   const { data, isLoading } = useSWR<{ employees: LiveEmployee[]; serverTime: string }>(
     isAdminOrHr ? "/api/location/live" : null,
-    { refreshInterval: 25000, revalidateOnFocus: true },
+    { refreshInterval: 5000, revalidateOnFocus: true },
   )
 
-  // Distance-travelled-today per employee (updates every 2 min — cheap).
+  // Distance-travelled-today per employee. Kept on a slower 60s beat — it's the
+  // heavier (full-day) query and the distance is a 5-min-settled figure anyway.
   const { data: statsData } = useSWR<{ distanceByUser: Record<string, number>; teamKm: number }>(
     isAdminOrHr ? "/api/location/stats" : null,
-    { refreshInterval: 120000 },
+    { refreshInterval: 60000 },
   )
   const distanceByUser = statsData?.distanceByUser ?? {}
   const teamKm = statsData?.teamKm ?? 0

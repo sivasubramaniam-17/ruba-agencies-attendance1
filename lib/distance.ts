@@ -7,6 +7,10 @@ const MAX_ACCURACY_M = 50 // ignore fixes worse than this accuracy
 // Only count distance while actually travelling (bike/vehicle). Slower than this
 // is walking or GPS jitter and is ignored — so standing still adds 0 km.
 const MIN_TRAVEL_MPS = 10 / 3.6 // 10 km/h
+// Average each fixed time-window into a single centroid point. 5 minutes cancels
+// GPS jitter well enough that a stationary employee stays at 0 km (a shorter
+// window lets noise leak back in and inflate a standing person's distance).
+const WINDOW_MS = 5 * 60 * 1000 // 5 minutes
 
 export interface PingPoint {
   latitude: number
@@ -24,13 +28,11 @@ export function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: 
   return 2 * R * Math.asin(Math.sqrt(s))
 }
 
-// Average each fixed time-window into a single centroid point.
-const WINDOW_MS = 5 * 60 * 1000 // 5 minutes
-
 // Metres travelled for one user's time-ordered pings. To beat GPS jitter we
-// average every 5-minute window into one centroid (noise cancels out), then sum
-// the distance between consecutive centroids — so a person sitting still, whose
-// readings scatter around one spot, ends up with ~0 km.
+// average every window into one centroid (noise cancels out), then sum the
+// distance between consecutive centroids — so a person sitting still, whose
+// readings scatter around one spot, ends up with ~0 km. Only segments at genuine
+// travel speed are counted, so walking and jitter don't inflate the total.
 export function distanceMeters(points: PingPoint[]): number {
   // Drop unreliable fixes (poor accuracy = very noisy cell/wifi location).
   const good = points.filter((p) => p.accuracy == null || p.accuracy <= MAX_ACCURACY_M)

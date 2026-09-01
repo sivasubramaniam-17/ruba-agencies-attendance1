@@ -9,8 +9,9 @@ import { MapPin, Navigation, ShieldCheck } from "lucide-react"
 import { isNativeApp, startNativeUploader, stopNativeUploader, openAutoStartSettings } from "@/lib/native-uploader"
 import { isWithinTrackingHours } from "@/lib/tracking-hours"
 
-// Post the device position at most this often while sharing.
-const POST_INTERVAL_MS = 20000
+// Post the device position at most this often while sharing (foreground web
+// path). ~10s keeps the admin map near-live while the page is open.
+const POST_INTERVAL_MS = 10000
 const STORAGE_KEY = "shareLiveLocation"
 
 export function LiveLocationToggle() {

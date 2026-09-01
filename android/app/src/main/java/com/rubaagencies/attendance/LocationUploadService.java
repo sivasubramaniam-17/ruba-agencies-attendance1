@@ -73,26 +73,32 @@ public class LocationUploadService extends Service implements LocationListener {
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         if (locationManager == null) return;
         try {
-            // Ask for frequent fixes (minDistance 0) so we still post a heartbeat
-            // while the employee is standing still — otherwise they'd drop off
-            // the map. Actual upload rate is throttled below to MIN_POST_INTERVAL.
+            // Ask for fixes every ~8s (minDistance 0) so a moving employee can be
+            // posted near-live; standing still still yields a heartbeat. The actual
+            // upload rate is throttled above (fast while moving, slow while idle).
             if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                 locationManager.requestLocationUpdates(
-                        LocationManager.GPS_PROVIDER, 15000, 0, this, Looper.getMainLooper());
+                        LocationManager.GPS_PROVIDER, 8000, 0, this, Looper.getMainLooper());
             }
             if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
                 locationManager.requestLocationUpdates(
-                        LocationManager.NETWORK_PROVIDER, 15000, 0, this, Looper.getMainLooper());
+                        LocationManager.NETWORK_PROVIDER, 8000, 0, this, Looper.getMainLooper());
             }
         } catch (SecurityException e) {
             // Location permission not granted — nothing to do until it is.
         }
     }
 
-    // Throttle uploads so the two providers don't double-post and so we send at
-    // most one every ~30s (keeps the employee "live" without spamming the API).
-    private static final long MIN_POST_INTERVAL_MS = 30000;
+    // Adaptive throttle: when the employee is moving we post near-live (every
+    // ~10s) so the admin map tracks them like Google Maps; when they're standing
+    // still we drop to a ~45s heartbeat so office staff don't spam the API/DB and
+    // run up cost. The two providers also can't double-post inside these windows.
+    private static final long MOVING_POST_INTERVAL_MS = 10000;  // ~10s while moving
+    private static final long IDLE_POST_INTERVAL_MS = 45000;    // ~45s while still
+    private static final float MOVED_THRESHOLD_M = 30f;         // >30m = "moving"
     private long lastPostAt = 0;
+    private double lastLat = Double.NaN;
+    private double lastLng = Double.NaN;
 
     private long lastGpsAt = 0;
 
@@ -108,8 +114,19 @@ public class LocationUploadService extends Service implements LocationListener {
         if (isGps) lastGpsAt = now;
         else if (now - lastGpsAt < 120000) return;
 
-        if (now - lastPostAt < MIN_POST_INTERVAL_MS) return;
+        // How far since the last upload? Decides the fast vs heartbeat interval.
+        float moved = Float.MAX_VALUE;
+        if (!Double.isNaN(lastLat)) {
+            float[] r = new float[1];
+            Location.distanceBetween(lastLat, lastLng, location.getLatitude(), location.getLongitude(), r);
+            moved = r[0];
+        }
+        long minInterval = moved >= MOVED_THRESHOLD_M ? MOVING_POST_INTERVAL_MS : IDLE_POST_INTERVAL_MS;
+        if (now - lastPostAt < minInterval) return;
+
         lastPostAt = now;
+        lastLat = location.getLatitude();
+        lastLng = location.getLongitude();
         uploadLocation(location);
     }
 
