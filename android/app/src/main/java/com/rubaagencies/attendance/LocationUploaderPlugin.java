@@ -1,8 +1,12 @@
 package com.rubaagencies.attendance;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
+import android.os.PowerManager;
+import android.provider.Settings;
 
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
@@ -58,7 +62,27 @@ public class LocationUploaderPlugin extends Plugin {
         } else {
             getContext().startService(intent);
         }
+        requestBatteryExemption();
         call.resolve();
+    }
+
+    // Ask the OS (one-tap system dialog) to stop battery-optimising this app, so
+    // MIUI/Oppo/etc. don't kill the foreground service after a few minutes.
+    // Only shows if not already granted.
+    private void requestBatteryExemption() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+        try {
+            PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+            String pkg = getContext().getPackageName();
+            if (pm != null && !pm.isIgnoringBatteryOptimizations(pkg)) {
+                Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                intent.setData(Uri.parse("package:" + pkg));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(intent);
+            }
+        } catch (Exception ignored) {
+            // Some ROMs block this dialog — the user can still whitelist manually.
+        }
     }
 
     @PluginMethod
