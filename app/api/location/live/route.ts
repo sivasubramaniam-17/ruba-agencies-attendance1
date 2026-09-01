@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth"
 
 // How recently an employee must have pinged to count as "live" on the map.
 // Generous enough to survive brief tab-switches / throttled background timers.
-const ACTIVE_WINDOW_MS = 3 * 60 * 1000 // 3 minutes
+const ACTIVE_WINDOW_MS = 5 * 60 * 1000 // 5 minutes
 // How much of the recent path (breadcrumb trail) to show.
 const TRAIL_WINDOW_MS = 30 * 60 * 1000 // 30 minutes
 // Cap points per trail to keep the payload light.

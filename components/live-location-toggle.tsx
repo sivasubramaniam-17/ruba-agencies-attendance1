@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { MapPin, Navigation, ShieldCheck } from "lucide-react"
-import { isNativeApp, startNativeUploader, stopNativeUploader } from "@/lib/native-uploader"
+import { isNativeApp, startNativeUploader, stopNativeUploader, openAutoStartSettings } from "@/lib/native-uploader"
 
 // Post the device position at most this often while sharing.
 const POST_INTERVAL_MS = 20000
@@ -18,6 +18,7 @@ export function LiveLocationToggle() {
   const [accuracy, setAccuracy] = useState<number | null>(null)
   const [lastSentAt, setLastSentAt] = useState<Date | null>(null)
   const [hasFix, setHasFix] = useState(false)
+  const [native, setNative] = useState(false)
 
   const watchIdRef = useRef<number | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -179,6 +180,7 @@ export function LiveLocationToggle() {
 
   // Resume sharing on reload if the employee left it on. Always clean up on unmount.
   useEffect(() => {
+    setNative(isNativeApp())
     if (typeof window !== "undefined" && localStorage.getItem(STORAGE_KEY) === "1") {
       setSharing(true)
       start()
@@ -251,6 +253,22 @@ export function LiveLocationToggle() {
           <Alert variant="destructive">
             <AlertDescription className="text-xs">{error}</AlertDescription>
           </Alert>
+        )}
+
+        {native && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p className="text-xs font-medium text-amber-900">Keep tracking after closing the app</p>
+            <p className="mt-0.5 text-[11px] leading-snug text-amber-700">
+              On Xiaomi/Oppo/Vivo phones, enable <b>Autostart</b> once so tracking isn't killed in the background.
+            </p>
+            <button
+              type="button"
+              onClick={() => openAutoStartSettings()}
+              className="mt-2 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600"
+            >
+              Open Autostart settings
+            </button>
+          </div>
         )}
 
         <p className="flex items-start gap-1.5 text-[11px] leading-snug text-gray-400">

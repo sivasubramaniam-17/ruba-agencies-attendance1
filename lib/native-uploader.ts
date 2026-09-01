@@ -32,3 +32,13 @@ export async function stopNativeUploader(): Promise<void> {
     // ignore
   }
 }
+
+// Opens the phone's Autostart settings (Xiaomi/Oppo/etc.) so the employee can
+// enable it in one tap — the one setting that can't be turned on by code.
+export async function openAutoStartSettings(): Promise<void> {
+  try {
+    await LocationUploader.openAutoStartSettings()
+  } catch {
+    // ignore
+  }
+}

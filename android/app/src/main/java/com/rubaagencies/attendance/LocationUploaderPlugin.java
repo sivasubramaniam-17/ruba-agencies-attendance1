@@ -1,6 +1,7 @@
 package com.rubaagencies.attendance;
 
 import android.Manifest;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -88,6 +89,43 @@ public class LocationUploaderPlugin extends Plugin {
     @PluginMethod
     public void stop(PluginCall call) {
         getContext().stopService(new Intent(getContext(), LocationUploadService.class));
+        call.resolve();
+    }
+
+    // Opens the phone's "Autostart" management screen (MIUI/Oppo/Vivo/Huawei) so
+    // the employee can enable it with one tap. Falls back to the app info page.
+    @PluginMethod
+    public void openAutoStartSettings(PluginCall call) {
+        Context ctx = getContext();
+        String[][] targets = {
+                {"com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"},
+                {"com.letv.android.letvsafe", "com.letv.android.letvsafe.AutobootManageActivity"},
+                {"com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"},
+                {"com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"},
+                {"com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity"},
+                {"com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"},
+                {"com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"},
+        };
+        for (String[] t : targets) {
+            try {
+                Intent intent = new Intent();
+                intent.setComponent(new ComponentName(t[0], t[1]));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(intent);
+                call.resolve();
+                return;
+            } catch (Exception ignored) {
+                // try the next OEM target
+            }
+        }
+        // Fallback: the standard app info screen (Autostart/Battery live under it).
+        try {
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.parse("package:" + ctx.getPackageName()));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            ctx.startActivity(intent);
+        } catch (Exception ignored) {
+        }
         call.resolve();
     }
 }
