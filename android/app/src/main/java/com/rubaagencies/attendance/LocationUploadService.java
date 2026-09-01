@@ -97,10 +97,18 @@ public class LocationUploadService extends Service implements LocationListener {
     @Override
     public void onLocationChanged(Location location) {
         if (location == null) return;
+        if (!withinTrackingHours()) return; // off after 10 PM until 6 AM (IST)
         long now = System.currentTimeMillis();
         if (now - lastPostAt < MIN_POST_INTERVAL_MS) return;
         lastPostAt = now;
         uploadLocation(location);
+    }
+
+    // Tracking window: 06:00–22:00 IST. Outside it, don't post.
+    private boolean withinTrackingHours() {
+        java.util.Calendar cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Kolkata"));
+        int hour = cal.get(java.util.Calendar.HOUR_OF_DAY);
+        return hour >= 6 && hour < 22;
     }
 
     private void uploadLocation(final Location loc) {

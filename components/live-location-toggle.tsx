@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { MapPin, Navigation, ShieldCheck } from "lucide-react"
 import { isNativeApp, startNativeUploader, stopNativeUploader, openAutoStartSettings } from "@/lib/native-uploader"
+import { isWithinTrackingHours } from "@/lib/tracking-hours"
 
 // Post the device position at most this often while sharing.
 const POST_INTERVAL_MS = 20000
@@ -19,6 +20,7 @@ export function LiveLocationToggle() {
   const [lastSentAt, setLastSentAt] = useState<Date | null>(null)
   const [hasFix, setHasFix] = useState(false)
   const [native, setNative] = useState(false)
+  const [offHours, setOffHours] = useState(false)
 
   const watchIdRef = useRef<number | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -189,6 +191,14 @@ export function LiveLocationToggle() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Track whether we're outside the 6 AM–10 PM window (checked every minute).
+  useEffect(() => {
+    const check = () => setOffHours(!isWithinTrackingHours())
+    check()
+    const id = setInterval(check, 60000)
+    return () => clearInterval(id)
+  }, [])
+
   // Self-healing: background tabs get their timers throttled/suspended, so when
   // the page becomes visible again (or the network reconnects) push a fresh ping
   // immediately and make sure the interval is still running.
@@ -230,7 +240,13 @@ export function LiveLocationToggle() {
           <Switch checked={sharing} onCheckedChange={handleToggle} aria-label="Share live location" />
         </div>
 
-        {sharing && (
+        {sharing && offHours && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            ⏸ Paused for the night — tracking is off after 10 PM and resumes automatically at 6 AM.
+          </div>
+        )}
+
+        {sharing && !offHours && (
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
               <span className="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-green-500" />

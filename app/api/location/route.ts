@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { prisma } from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { verifyLocationToken } from "@/lib/location-token"
+import { isWithinTrackingHours } from "@/lib/tracking-hours"
 
 // Employee device posts its current GPS position here while "Share live
 // location" is on. One lightweight row per ping; old rows are pruned so the
@@ -41,6 +42,12 @@ export async function POST(request: NextRequest) {
     }
     if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
       return NextResponse.json({ error: "Coordinates out of range" }, { status: 400 })
+    }
+
+    // Outside tracking hours (after 10 PM / before 6 AM): don't record. Reply
+    // with off:true so clients can stop posting until morning.
+    if (!isWithinTrackingHours()) {
+      return NextResponse.json({ success: false, off: true })
     }
 
     await prisma.locationPing.create({
