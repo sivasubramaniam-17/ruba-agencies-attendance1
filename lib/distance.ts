@@ -21,21 +21,43 @@ export function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: 
   return 2 * R * Math.asin(Math.sqrt(s))
 }
 
-// Metres travelled for one user's time-ordered pings.
+// Average each fixed time-window into a single centroid point.
+const WINDOW_MS = 5 * 60 * 1000 // 5 minutes
+
+// Metres travelled for one user's time-ordered pings. To beat GPS jitter we
+// average every 5-minute window into one centroid (noise cancels out), then sum
+// the distance between consecutive centroids — so a person sitting still, whose
+// readings scatter around one spot, ends up with ~0 km.
 export function distanceMeters(points: PingPoint[]): number {
-  let meters = 0
-  let ref: PingPoint | null = null // last point we actually moved from
-  for (const p of points) {
-    if (p.accuracy != null && p.accuracy > MAX_ACCURACY_M) continue
-    if (!ref) {
-      ref = p
-      continue
+  // Drop unreliable fixes (poor accuracy = very noisy cell/wifi location).
+  const good = points.filter((p) => p.accuracy == null || p.accuracy <= MAX_ACCURACY_M)
+  if (good.length < 2) return 0
+
+  // Bucket into windows and take each window's centroid (mean position).
+  const buckets = new Map<number, { sumLat: number; sumLng: number; n: number; t: number }>()
+  for (const p of good) {
+    const key = Math.floor(p.createdAt.getTime() / WINDOW_MS)
+    const b = buckets.get(key)
+    if (b) {
+      b.sumLat += p.latitude
+      b.sumLng += p.longitude
+      b.n++
+    } else {
+      buckets.set(key, { sumLat: p.latitude, sumLng: p.longitude, n: 1, t: key * WINDOW_MS })
     }
-    const d = haversineMeters(ref.latitude, ref.longitude, p.latitude, p.longitude)
-    if (d < NOISE_FLOOR_M) continue // jitter — keep the same reference
-    const dt = Math.max(1, (p.createdAt.getTime() - ref.createdAt.getTime()) / 1000)
-    if (d / dt <= MAX_SPEED_MPS) meters += d
-    ref = p
+  }
+  const centroids = Array.from(buckets.values())
+    .sort((a, b) => a.t - b.t)
+    .map((b) => ({ lat: b.sumLat / b.n, lng: b.sumLng / b.n, t: b.t }))
+
+  let meters = 0
+  for (let i = 1; i < centroids.length; i++) {
+    const a = centroids[i - 1]
+    const c = centroids[i]
+    const d = haversineMeters(a.lat, a.lng, c.lat, c.lng)
+    if (d < NOISE_FLOOR_M) continue // residual jitter between windows — ignore
+    const dt = Math.max(1, (c.t - a.t) / 1000)
+    if (d / dt <= MAX_SPEED_MPS) meters += d // real, plausible movement
   }
   return meters
 }
