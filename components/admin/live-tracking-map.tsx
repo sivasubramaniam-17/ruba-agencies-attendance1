@@ -1,10 +1,51 @@
 "use client"
 
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import type { ReactNode } from "react"
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { type LiveEmployee, STATUS_META } from "@/components/admin/live-status"
+
+// A marker that glides smoothly to each new position (Swiggy-style) instead of
+// jumping — it interpolates lat/lng over ~1.4s whenever the target changes.
+function AnimatedMarker({
+  position,
+  icon,
+  children,
+}: {
+  position: [number, number]
+  icon?: L.DivIcon
+  children?: ReactNode
+}) {
+  const [current, setCurrent] = useState<[number, number]>(position)
+  const fromRef = useRef<[number, number]>(position)
+
+  useEffect(() => {
+    const from = fromRef.current
+    const to = position
+    if (from[0] === to[0] && from[1] === to[1]) return
+    const duration = 1400
+    let start: number | null = null
+    let raf = 0
+    const step = (t: number) => {
+      if (start === null) start = t
+      const p = Math.min(1, (t - start) / duration)
+      const eased = 1 - Math.pow(1 - p, 3)
+      setCurrent([from[0] + (to[0] - from[0]) * eased, from[1] + (to[1] - from[1]) * eased])
+      if (p < 1) raf = requestAnimationFrame(step)
+      else fromRef.current = to
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [position])
+
+  return (
+    <Marker position={current} icon={icon}>
+      {children}
+    </Marker>
+  )
+}
 
 // A Swiggy-style teardrop pin: colored map pin with the employee's initials
 // and a soft pulse at the tip so live people are easy to spot.
@@ -105,7 +146,7 @@ export default function LiveTrackingMap({
               radius={accuracyRadius}
               pathOptions={{ color: meta.color, weight: 1, fillColor: meta.color, fillOpacity: 0.15 }}
             />
-            <Marker position={pos} icon={icons.get(e.user.id)}>
+            <AnimatedMarker position={pos} icon={icons.get(e.user.id)}>
               <Popup>
                 <div style={{ minWidth: 180 }}>
                   <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>
@@ -143,7 +184,7 @@ export default function LiveTrackingMap({
                   </div>
                 </div>
               </Popup>
-            </Marker>
+            </AnimatedMarker>
           </div>
         )
       })}
