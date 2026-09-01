@@ -1,11 +1,12 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { prisma } from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
 import { computeAndStoreToday } from "@/lib/daily-distance"
 
-// Admin/HR: stored daily distance per employee for the last 30 days.
-export async function GET() {
+// Admin/HR: stored daily distance per employee. Optional ?from=YYYY-MM-DD&to=YYYY-MM-DD
+// (defaults to the last 30 days).
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email || (session.user.role !== "ADMIN" && session.user.role !== "HR")) {
@@ -15,12 +16,22 @@ export async function GET() {
     // Keep today's row current before reading history.
     await computeAndStoreToday()
 
-    const since = new Date()
-    since.setUTCDate(since.getUTCDate() - 30)
-    since.setUTCHours(0, 0, 0, 0)
+    const { searchParams } = new URL(request.url)
+    const fromParam = searchParams.get("from")
+    const toParam = searchParams.get("to")
+
+    let from: Date
+    if (fromParam) {
+      from = new Date(`${fromParam}T00:00:00.000Z`)
+    } else {
+      from = new Date()
+      from.setUTCDate(from.getUTCDate() - 30)
+      from.setUTCHours(0, 0, 0, 0)
+    }
+    const to = toParam ? new Date(`${toParam}T23:59:59.999Z`) : new Date()
 
     const records = await prisma.dailyDistance.findMany({
-      where: { date: { gte: since } },
+      where: { date: { gte: from, lte: to } },
       orderBy: { date: "desc" },
       include: {
         user: { select: { id: true, firstName: true, lastName: true, employeeId: true, department: true } },

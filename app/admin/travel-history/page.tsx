@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import useSWR from "swr"
@@ -29,8 +29,33 @@ export default function TravelHistoryPage() {
   const router = useRouter()
   const isAdminOrHr = session && (session.user.role === "ADMIN" || session.user.role === "HR")
 
+  const [range, setRange] = useState<"week" | "month" | "30d" | "custom">("30d")
+  const [customFrom, setCustomFrom] = useState("")
+  const [customTo, setCustomTo] = useState("")
+
+  const { from, to } = useMemo(() => {
+    const ymd = (d: Date) => d.toISOString().split("T")[0]
+    const today = new Date()
+    const toStr = ymd(today)
+    if (range === "week") {
+      const d = new Date(today)
+      const dow = d.getDay() // 0 = Sunday
+      d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1)) // back to Monday
+      return { from: ymd(d), to: toStr }
+    }
+    if (range === "month") {
+      return { from: ymd(new Date(today.getFullYear(), today.getMonth(), 1)), to: toStr }
+    }
+    if (range === "custom" && customFrom && customTo) {
+      return { from: customFrom, to: customTo }
+    }
+    const d = new Date(today)
+    d.setDate(d.getDate() - 29)
+    return { from: ymd(d), to: toStr }
+  }, [range, customFrom, customTo])
+
   const { data, isLoading } = useSWR<{ employees: HistEmployee[] }>(
-    isAdminOrHr ? "/api/location/history" : null,
+    isAdminOrHr ? `/api/location/history?from=${from}&to=${to}` : null,
     { refreshInterval: 300000, revalidateOnFocus: true },
   )
 
@@ -105,6 +130,45 @@ export default function TravelHistoryPage() {
             </Button>
           }
         />
+
+        {/* Date range filter */}
+        <div className="flex flex-wrap items-center gap-2">
+          {(
+            [
+              ["week", "This Week"],
+              ["month", "This Month"],
+              ["30d", "30 Days"],
+              ["custom", "Custom"],
+            ] as const
+          ).map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setRange(val)}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                range === val ? "bg-violet-600 text-white" : "bg-violet-50 text-violet-700 hover:bg-violet-100"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          {range === "custom" && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="rounded-md border border-violet-200 px-2 py-1 text-xs"
+              />
+              <span className="text-xs text-gray-400">to</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="rounded-md border border-violet-200 px-2 py-1 text-xs"
+              />
+            </div>
+          )}
+        </div>
 
         {isLoading && !data ? (
           <Card className="border-violet-100">
