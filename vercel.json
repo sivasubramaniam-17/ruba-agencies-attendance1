@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/location/finalize",
+      "schedule": "35 16 * * *"
+    }
+  ]
+}

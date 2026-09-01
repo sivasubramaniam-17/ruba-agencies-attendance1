@@ -42,6 +42,7 @@ import {
   FileText,
   ChevronDown,
   MapPin,
+  Route,
 } from "lucide-react"
 import { signOut } from "next-auth/react"
 import Link from "next/link"
@@ -111,6 +112,11 @@ const adminMenuItems = [
     title: "Live Tracking",
     url: "/admin/live-tracking",
     icon: MapPin,
+  },
+  {
+    title: "Travel History",
+    url: "/admin/travel-history",
+    icon: Route,
   },
   {
     title: "Notifications",

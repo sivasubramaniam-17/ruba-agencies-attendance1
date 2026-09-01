@@ -10,3 +10,15 @@ export function isWithinTrackingHours(date: Date = new Date()): boolean {
   const istMinutes = (date.getUTCHours() * 60 + date.getUTCMinutes() + 330) % 1440
   return istMinutes >= TRACKING_START_HOUR * 60 && istMinutes < TRACKING_END_HOUR * 60
 }
+
+// The UTC instant when the current IST day began (for "since midnight" queries).
+export function istMidnightUtc(now: Date = new Date()): Date {
+  const ist = new Date(now.getTime() + 330 * 60000)
+  return new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()) - 330 * 60000)
+}
+
+// A UTC-midnight Date representing the current IST calendar day (storage key).
+export function istDayKey(now: Date = new Date()): Date {
+  const ist = new Date(now.getTime() + 330 * 60000)
+  return new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()))
+}
