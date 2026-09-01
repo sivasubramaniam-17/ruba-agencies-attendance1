@@ -94,11 +94,20 @@ public class LocationUploadService extends Service implements LocationListener {
     private static final long MIN_POST_INTERVAL_MS = 30000;
     private long lastPostAt = 0;
 
+    private long lastGpsAt = 0;
+
     @Override
     public void onLocationChanged(Location location) {
         if (location == null) return;
         if (!withinTrackingHours()) return; // off after 10 PM until 6 AM (IST)
         long now = System.currentTimeMillis();
+
+        // Prefer precise GPS fixes. If this is a coarse network (cell/wifi) fix but
+        // we had a real GPS fix in the last 2 minutes, skip it so the pin stays sharp.
+        boolean isGps = LocationManager.GPS_PROVIDER.equals(location.getProvider());
+        if (isGps) lastGpsAt = now;
+        else if (now - lastGpsAt < 120000) return;
+
         if (now - lastPostAt < MIN_POST_INTERVAL_MS) return;
         lastPostAt = now;
         uploadLocation(location);
