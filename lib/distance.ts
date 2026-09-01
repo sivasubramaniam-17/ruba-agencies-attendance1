@@ -4,6 +4,9 @@
 const MAX_SPEED_MPS = 55 // ~200 km/h — anything faster is a GPS glitch
 const NOISE_FLOOR_M = 50 // movement below this is treated as jitter, not travel
 const MAX_ACCURACY_M = 50 // ignore fixes worse than this accuracy
+// Only count distance while actually travelling (bike/vehicle). Slower than this
+// is walking or GPS jitter and is ignored — so standing still adds 0 km.
+const MIN_TRAVEL_MPS = 10 / 3.6 // 10 km/h
 
 export interface PingPoint {
   latitude: number
@@ -57,7 +60,9 @@ export function distanceMeters(points: PingPoint[]): number {
     const d = haversineMeters(a.lat, a.lng, c.lat, c.lng)
     if (d < NOISE_FLOOR_M) continue // residual jitter between windows — ignore
     const dt = Math.max(1, (c.t - a.t) / 1000)
-    if (d / dt <= MAX_SPEED_MPS) meters += d // real, plausible movement
+    const speed = d / dt
+    // Count only genuine travel (bike/vehicle), not walking or jitter.
+    if (speed >= MIN_TRAVEL_MPS && speed <= MAX_SPEED_MPS) meters += d
   }
   return meters
 }

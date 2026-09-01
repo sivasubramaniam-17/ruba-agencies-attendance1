@@ -159,6 +159,11 @@ export default function LiveTrackingPage() {
                           <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: meta.color }} />
                           {meta.label}
                         </span>
+                        {e.mode === "riding" && (
+                          <span className="mt-1 ml-1 inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
+                            🏍️ Riding · {e.speedKmh} km/h
+                          </span>
+                        )}
                         <p className="mt-1 flex items-start gap-1 text-[11px] text-gray-600">
                           <MapPin className="mt-[1px] h-3 w-3 shrink-0 text-violet-500" />
                           <span className="truncate">{areas[e.user.id] || "Locating area…"}</span>

@@ -172,6 +172,11 @@ export default function LiveTrackingMap({
                     <span style={{ width: 7, height: 7, borderRadius: 9999, background: meta.color }} />
                     {meta.label}
                   </div>
+                  {e.mode === "riding" && (
+                    <div style={{ fontSize: 12, color: "#7c3aed", fontWeight: 700, margin: "2px 0 4px" }}>
+                      🏍️ Riding · {e.speedKmh} km/h
+                    </div>
+                  )}
                   {areas[e.user.id] && (
                     <div style={{ fontSize: 12, color: "#333", fontWeight: 600, margin: "2px 0 4px" }}>
                       📍 {areas[e.user.id]}

@@ -13,6 +13,8 @@ export interface LiveEmployee {
     department: string
   }
   status: LiveStatus
+  speedKmh: number
+  mode: "riding" | "walking" | "stationary"
   checkInTime: string | null
   checkOutTime: string | null
   current: {

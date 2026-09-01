@@ -137,9 +137,27 @@ export async function GET() {
         // the trail only shows plausible movement.
         const recent = arr.length > MAX_TRAIL_POINTS ? arr.slice(-MAX_TRAIL_POINTS) : arr
         const trailArr = filterOutliers(recent)
+
+        // Current speed → travel mode. Use the GPS speed if present, else derive
+        // it from the last two trail points. >20 km/h = riding (bike/vehicle).
+        let speedKmh = 0
+        if (typeof last.speed === "number" && last.speed >= 0) {
+          speedKmh = last.speed * 3.6
+        } else if (trailArr.length >= 2) {
+          const a = trailArr[trailArr.length - 2]
+          const b = trailArr[trailArr.length - 1]
+          const dMeters = haversineMeters(a.latitude, a.longitude, b.latitude, b.longitude)
+          const dtSec = Math.max(1, (b.createdAt.getTime() - a.createdAt.getTime()) / 1000)
+          speedKmh = (dMeters / dtSec) * 3.6
+        }
+        const mode: "riding" | "walking" | "stationary" =
+          speedKmh > 20 ? "riding" : speedKmh > 3 ? "walking" : "stationary"
+
         return {
           user,
           status: statusFor(userId),
+          speedKmh: Math.round(speedKmh),
+          mode,
           checkInTime: att?.checkInTime ? att.checkInTime.toISOString() : null,
           checkOutTime: att?.checkOutTime ? att.checkOutTime.toISOString() : null,
           current: {
