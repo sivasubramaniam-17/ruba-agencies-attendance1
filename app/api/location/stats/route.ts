@@ -5,6 +5,10 @@ import { authOptions } from "@/lib/auth"
 
 // Distance a point can jump between fixes before we treat it as a GPS glitch.
 const MAX_SPEED_MPS = 55 // ~200 km/h
+// Movement below this (metres) is treated as GPS jitter, not real travel.
+const NOISE_FLOOR_M = 25
+// Ignore fixes worse than this accuracy (metres) — cell/wifi fixes are too noisy.
+const MAX_ACCURACY_M = 50
 
 function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number) {
   const R = 6371000
@@ -30,7 +34,7 @@ export async function GET() {
     const pings = await prisma.locationPing.findMany({
       where: { createdAt: { gte: todayStart } },
       orderBy: { createdAt: "asc" },
-      select: { userId: true, latitude: true, longitude: true, createdAt: true },
+      select: { userId: true, latitude: true, longitude: true, accuracy: true, createdAt: true },
     })
 
     // Group by user and sum plausible segment distances.
@@ -45,14 +49,22 @@ export async function GET() {
     let teamMeters = 0
     for (const [userId, arr] of byUser) {
       let meters = 0
-      let prev: (typeof arr)[number] | null = null
+      // "ref" is the last point we actually moved from. We only advance it (and
+      // add distance) once a new fix is clearly beyond GPS jitter — so standing
+      // still doesn't accumulate fake metres.
+      let ref: (typeof arr)[number] | null = null
       for (const p of arr) {
-        if (prev) {
-          const d = haversineMeters(prev.latitude, prev.longitude, p.latitude, p.longitude)
-          const dt = Math.max(1, (p.createdAt.getTime() - prev.createdAt.getTime()) / 1000)
-          if (d / dt <= MAX_SPEED_MPS) meters += d // skip teleport outliers
+        // Skip unreliable fixes (poor accuracy = noisy cell/wifi location).
+        if (p.accuracy != null && p.accuracy > MAX_ACCURACY_M) continue
+        if (!ref) {
+          ref = p
+          continue
         }
-        prev = p
+        const d = haversineMeters(ref.latitude, ref.longitude, p.latitude, p.longitude)
+        if (d < NOISE_FLOOR_M) continue // jitter — keep the same reference point
+        const dt = Math.max(1, (p.createdAt.getTime() - ref.createdAt.getTime()) / 1000)
+        if (d / dt <= MAX_SPEED_MPS) meters += d // real, plausible movement
+        ref = p
       }
       const km = Math.round((meters / 1000) * 10) / 10
       distanceByUser[userId] = km
