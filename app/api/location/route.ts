@@ -2,23 +2,36 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { prisma } from "@/lib/prisma"
 import { authOptions } from "@/lib/auth"
+import { verifyLocationToken } from "@/lib/location-token"
 
 // Employee device posts its current GPS position here while "Share live
 // location" is on. One lightweight row per ping; old rows are pruned so the
 // table stays small.
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    // Two auth paths: a Bearer token (native background service, no cookies) or
+    // the normal browser session.
+    let userId: string | null = null
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true },
-    })
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    const auth = request.headers.get("authorization") || ""
+    if (auth.startsWith("Bearer ")) {
+      userId = verifyLocationToken(auth.slice(7).trim())
+      if (!userId) {
+        return NextResponse.json({ error: "Invalid token" }, { status: 401 })
+      }
+    } else {
+      const session = await getServerSession(authOptions)
+      if (!session?.user?.email) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+      const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { id: true },
+      })
+      if (!user) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 })
+      }
+      userId = user.id
     }
 
     const { latitude, longitude, accuracy, heading, speed } = await request.json()
@@ -32,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     await prisma.locationPing.create({
       data: {
-        userId: user.id,
+        userId,
         latitude,
         longitude,
         accuracy: typeof accuracy === "number" ? accuracy : null,

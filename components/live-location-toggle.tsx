@@ -6,10 +6,10 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { MapPin, Navigation, ShieldCheck } from "lucide-react"
-import { isNativeApp, startNativeTracking, stopNativeTracking } from "@/lib/native-tracking"
+import { isNativeApp, startNativeUploader, stopNativeUploader } from "@/lib/native-uploader"
 
 // Post the device position at most this often while sharing.
-const POST_INTERVAL_MS = 10000
+const POST_INTERVAL_MS = 20000
 const STORAGE_KEY = "shareLiveLocation"
 
 export function LiveLocationToggle() {
@@ -73,7 +73,7 @@ export function LiveLocationToggle() {
   }, [])
 
   const stop = useCallback(() => {
-    if (isNativeApp()) stopNativeTracking()
+    if (isNativeApp()) stopNativeUploader()
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current)
       watchIdRef.current = null
@@ -95,7 +95,7 @@ export function LiveLocationToggle() {
     if (isNativeApp()) {
       setError(null)
       sharingRef.current = true
-      startNativeTracking().then((ok) => {
+      startNativeUploader().then((ok) => {
         if (ok) {
           setHasFix(true)
           setLastSentAt(new Date())

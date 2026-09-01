@@ -44,7 +44,7 @@ export async function startNativeTracking(): Promise<boolean> {
         backgroundMessage: "Sharing your live location.",
         requestPermissions: true,
         stale: false,
-        distanceFilter: 10, // metres of movement before a new update
+        distanceFilter: 25, // metres of movement before a new update (cost-tuned)
       },
       (location: any, error: any) => {
         if (error) return

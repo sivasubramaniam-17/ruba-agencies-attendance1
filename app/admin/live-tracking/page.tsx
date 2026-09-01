@@ -29,7 +29,7 @@ export default function LiveTrackingPage() {
   // Poll the live feed every 8s; dedupe/caching handled by SWR.
   const { data, isLoading } = useSWR<{ employees: LiveEmployee[]; serverTime: string }>(
     session && (session.user.role === "ADMIN" || session.user.role === "HR") ? "/api/location/live" : null,
-    { refreshInterval: 5000, revalidateOnFocus: true },
+    { refreshInterval: 25000, revalidateOnFocus: true },
   )
 
   const employees = data?.employees ?? []
@@ -74,7 +74,7 @@ export default function LiveTrackingPage() {
               Live Tracking
             </h1>
             <p className="text-sm text-gray-500">
-              Employees currently sharing their location (updates every ~5s).
+              Employees currently sharing their location (updates every ~25s).
             </p>
           </div>
           <Badge className="w-fit bg-green-100 text-green-700 hover:bg-green-100">
