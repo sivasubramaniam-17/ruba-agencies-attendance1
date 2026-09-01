@@ -73,23 +73,34 @@ public class LocationUploadService extends Service implements LocationListener {
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         if (locationManager == null) return;
         try {
-            // Update at most every 15s, and after ~25m of movement.
+            // Ask for frequent fixes (minDistance 0) so we still post a heartbeat
+            // while the employee is standing still — otherwise they'd drop off
+            // the map. Actual upload rate is throttled below to MIN_POST_INTERVAL.
             if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                 locationManager.requestLocationUpdates(
-                        LocationManager.GPS_PROVIDER, 15000, 25, this, Looper.getMainLooper());
+                        LocationManager.GPS_PROVIDER, 15000, 0, this, Looper.getMainLooper());
             }
             if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
                 locationManager.requestLocationUpdates(
-                        LocationManager.NETWORK_PROVIDER, 15000, 25, this, Looper.getMainLooper());
+                        LocationManager.NETWORK_PROVIDER, 15000, 0, this, Looper.getMainLooper());
             }
         } catch (SecurityException e) {
             // Location permission not granted — nothing to do until it is.
         }
     }
 
+    // Throttle uploads so the two providers don't double-post and so we send at
+    // most one every ~30s (keeps the employee "live" without spamming the API).
+    private static final long MIN_POST_INTERVAL_MS = 30000;
+    private long lastPostAt = 0;
+
     @Override
     public void onLocationChanged(Location location) {
-        if (location != null) uploadLocation(location);
+        if (location == null) return;
+        long now = System.currentTimeMillis();
+        if (now - lastPostAt < MIN_POST_INTERVAL_MS) return;
+        lastPostAt = now;
+        uploadLocation(location);
     }
 
     private void uploadLocation(final Location loc) {
