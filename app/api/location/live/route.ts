@@ -12,6 +12,11 @@ const TRAIL_WINDOW_MS = 30 * 60 * 1000 // 30 minutes
 const MAX_TRAIL_POINTS = 60
 // Anything faster than this between two points is a GPS glitch, not real travel.
 const MAX_SPEED_MPS = 55 // ~200 km/h
+// Trail cleanup: drop fixes worse than this accuracy (they scatter wildly)...
+const MAX_ACCURACY_M = 50
+// ...and only keep a new trail point once it's this far from the last kept one,
+// so a stationary person's jitter collapses to a dot instead of a spiky mess.
+const TRAIL_MIN_GAP_M = 35
 
 function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number) {
   const R = 6371000
@@ -36,6 +41,23 @@ function filterOutliers<T extends { latitude: number; longitude: number; created
     const dt = Math.max(1, (p.createdAt.getTime() - prev.createdAt.getTime()) / 1000)
     if (dist / dt <= MAX_SPEED_MPS) kept.push(p)
   }
+  return kept
+}
+
+// Collapse GPS jitter into a clean path: keep a point only once it's meaningfully
+// far from the last kept one. A person standing still becomes a single dot; a
+// person actually moving keeps a clean path. The latest point is always kept so
+// the trail ends at the real current position.
+function simplifyTrail<T extends { latitude: number; longitude: number }>(points: T[]): T[] {
+  if (points.length < 2) return points
+  const kept: T[] = [points[0]]
+  for (let i = 1; i < points.length; i++) {
+    const prev = kept[kept.length - 1]
+    const p = points[i]
+    if (haversineMeters(prev.latitude, prev.longitude, p.latitude, p.longitude) >= TRAIL_MIN_GAP_M) kept.push(p)
+  }
+  const last = points[points.length - 1]
+  if (kept[kept.length - 1] !== last) kept.push(last)
   return kept
 }
 
@@ -133,10 +155,12 @@ export async function GET() {
         const user = userById.get(userId)
         if (!user) return null
         const att = attendanceByUser.get(userId)
-        // Downsample to the most recent points, then drop GPS-glitch outliers so
-        // the trail only shows plausible movement.
+        // Downsample to the most recent points, drop noisy/low-accuracy fixes and
+        // GPS-glitch outliers, then collapse jitter into a clean path so the map
+        // draws one smooth line instead of a spiky mess.
         const recent = arr.length > MAX_TRAIL_POINTS ? arr.slice(-MAX_TRAIL_POINTS) : arr
-        const trailArr = filterOutliers(recent)
+        const accurate = recent.filter((p) => p.accuracy == null || p.accuracy <= MAX_ACCURACY_M)
+        const trailArr = simplifyTrail(filterOutliers(accurate.length >= 2 ? accurate : recent))
 
         // Current speed → travel mode. Use the GPS speed if present, else derive
         // it from the last two trail points. >20 km/h = riding (bike/vehicle).

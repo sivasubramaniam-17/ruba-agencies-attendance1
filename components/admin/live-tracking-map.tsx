@@ -7,6 +7,31 @@ import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { type LiveEmployee, STATUS_META } from "@/components/admin/live-status"
 
+// Turn a jagged set of GPS points into a flowing curve (Uber/Swiggy look) by
+// interpolating a Catmull-Rom spline through them — the line passes through every
+// real point but bends smoothly between them instead of drawing sharp zig-zags.
+function smoothPath(pts: [number, number][], samplesPerSegment = 14): [number, number][] {
+  if (pts.length < 3) return pts
+  const cr = (p0: number, p1: number, p2: number, p3: number, t: number) => {
+    const t2 = t * t
+    const t3 = t2 * t
+    return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3)
+  }
+  const out: [number, number][] = []
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i === 0 ? 0 : i - 1]
+    const p1 = pts[i]
+    const p2 = pts[i + 1]
+    const p3 = pts[i + 2 < pts.length ? i + 2 : pts.length - 1]
+    for (let s = 0; s < samplesPerSegment; s++) {
+      const t = s / samplesPerSegment
+      out.push([cr(p0[0], p1[0], p2[0], p3[0], t), cr(p0[1], p1[1], p2[1], p3[1], t)])
+    }
+  }
+  out.push(pts[pts.length - 1])
+  return out
+}
+
 // A marker that glides smoothly to each new position (Swiggy-style) instead of
 // jumping — it interpolates lat/lng over ~1.4s whenever the target changes.
 function AnimatedMarker({
@@ -131,7 +156,8 @@ export default function LiveTrackingMap({
       {employees.map((e) => {
         const meta = STATUS_META[e.status]
         const pos: [number, number] = [e.current.latitude, e.current.longitude]
-        const trailPts = e.trail.map((p) => [p.latitude, p.longitude]) as [number, number][]
+        const rawTrail = e.trail.map((p) => [p.latitude, p.longitude]) as [number, number][]
+        const trailPts = smoothPath(rawTrail)
         // Accuracy circle marks the area the employee is standing in (like the
         // blue dot in Google Maps). Cap the visual radius so a poor fix on a
         // laptop doesn't cover the whole map.
@@ -139,7 +165,18 @@ export default function LiveTrackingMap({
         return (
           <div key={e.user.id}>
             {trailPts.length > 1 && (
-              <Polyline positions={trailPts} pathOptions={{ color: meta.color, weight: 4, opacity: 0.55 }} />
+              <>
+                {/* Soft glow underneath, then the crisp rounded line on top — a
+                    smooth, flowing route like Uber/Swiggy. */}
+                <Polyline
+                  positions={trailPts}
+                  pathOptions={{ color: meta.color, weight: 11, opacity: 0.15, lineCap: "round", lineJoin: "round" }}
+                />
+                <Polyline
+                  positions={trailPts}
+                  pathOptions={{ color: meta.color, weight: 4.5, opacity: 0.9, lineCap: "round", lineJoin: "round" }}
+                />
+              </>
             )}
             <Circle
               center={pos}
