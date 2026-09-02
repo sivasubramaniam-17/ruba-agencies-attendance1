@@ -83,10 +83,14 @@ function AnimatedMarker({
   position,
   icon,
   children,
+  duration = 1400,
+  linear = false,
 }: {
   position: [number, number]
   icon?: L.DivIcon
   children?: ReactNode
+  duration?: number // glide time; short + linear for fast replay so it flows smoothly
+  linear?: boolean
 }) {
   const [current, setCurrent] = useState<[number, number]>(position)
   const fromRef = useRef<[number, number]>(position)
@@ -95,20 +99,19 @@ function AnimatedMarker({
     const from = fromRef.current
     const to = position
     if (from[0] === to[0] && from[1] === to[1]) return
-    const duration = 1400
     let start: number | null = null
     let raf = 0
     const step = (t: number) => {
       if (start === null) start = t
       const p = Math.min(1, (t - start) / duration)
-      const eased = 1 - Math.pow(1 - p, 3)
+      const eased = linear ? p : 1 - Math.pow(1 - p, 3)
       setCurrent([from[0] + (to[0] - from[0]) * eased, from[1] + (to[1] - from[1]) * eased])
       if (p < 1) raf = requestAnimationFrame(step)
       else fromRef.current = to
     }
     raf = requestAnimationFrame(step)
     return () => cancelAnimationFrame(raf)
-  }, [position])
+  }, [position, duration, linear])
 
   return (
     <Marker position={current} icon={icon}>
@@ -302,7 +305,12 @@ export default function LiveTrackingMap({
             </Circle>
           ))}
           {replay.points[replay.index] && (
-            <AnimatedMarker position={replay.points[replay.index]} icon={makeIcon(replay.label, replay.color)} />
+            <AnimatedMarker
+              position={replay.points[replay.index]}
+              icon={makeIcon(replay.label, replay.color)}
+              duration={160}
+              linear
+            />
           )}
         </>
       ) : (
