@@ -138,14 +138,22 @@ function makeIcon(initials: string, color: string) {
 const fmtTime = (iso: string | null) =>
   iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"
 
-// Keep the map framed around whoever is currently live, and smoothly follow a
-// single moving employee (Swiggy-style) as their position updates.
-function FollowMap({ employees }: { employees: LiveEmployee[] }) {
+// Frame the map around everyone once on first load, and again only when someone
+// NEW joins — never on a routine refresh, and never while the admin has focused a
+// person (so clicking a card isn't undone by the next poll).
+function FollowMap({ employees, hasFocus }: { employees: LiveEmployee[]; hasFocus: boolean }) {
   const map = useMap()
+  const didFit = useRef(false)
+  const prevCount = useRef(0)
 
-  // Re-frame when the SET of live employees changes (not on every ping).
   useEffect(() => {
     if (employees.length === 0) return
+    const grew = employees.length > prevCount.current
+    prevCount.current = employees.length
+    // Fit on the very first data, or when the team grows — but not while focused.
+    if (didFit.current && !(grew && !hasFocus)) return
+    if (hasFocus && didFit.current) return
+    didFit.current = true
     const pts = employees.map((e) => [e.current.latitude, e.current.longitude]) as [number, number][]
     if (pts.length === 1) {
       map.setView(pts[0], Math.max(map.getZoom(), 15))
@@ -153,10 +161,10 @@ function FollowMap({ employees }: { employees: LiveEmployee[] }) {
       map.fitBounds(L.latLngBounds(pts).pad(0.25))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employees.map((e) => e.user.id).join(",")])
+  }, [employees.length, hasFocus])
 
-  // When exactly one person is live, pan the map to follow them as they move.
-  const only = employees.length === 1 ? employees[0] : null
+  // When exactly one person is live (and none focused), gently follow them.
+  const only = !hasFocus && employees.length === 1 ? employees[0] : null
   const lat = only?.current.latitude
   const lng = only?.current.longitude
   useEffect(() => {
@@ -213,7 +221,7 @@ export default function LiveTrackingMap({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         maxZoom={19}
       />
-      <FollowMap employees={employees} />
+      <FollowMap employees={employees} hasFocus={!!focusId} />
       <FocusEmployee id={focusId} positions={displayPositions} />
 
       {employees.map((e) => {
