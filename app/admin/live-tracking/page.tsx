@@ -8,7 +8,7 @@ import useSWR from "swr"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { MapPin, Users, Radio } from "lucide-react"
+import { MapPin, Users, Radio, Maximize } from "lucide-react"
 import { type LiveEmployee, STATUS_META } from "@/components/admin/live-status"
 import { reverseGeocode } from "@/lib/reverse-geocode"
 
@@ -46,6 +46,12 @@ export default function LiveTrackingPage() {
 
   // Which employee the admin tapped in the list — the map flies to them.
   const [focusId, setFocusId] = useState<string | null>(null)
+  // Bump to re-frame the map back to the overview ("Reset view").
+  const [resetSignal, setResetSignal] = useState(0)
+  const resetView = () => {
+    setFocusId(null)
+    setResetSignal((n) => n + 1)
+  }
 
   const employees = data?.employees ?? []
 
@@ -117,7 +123,7 @@ export default function LiveTrackingPage() {
           {/* Map — sticks just below the header so it stays in view while the
               employee list scrolls beside it. */}
           <Card className="overflow-hidden border-violet-200 shadow-lg lg:col-span-3 lg:sticky lg:top-20 lg:self-start">
-            <div className="h-[60vh] min-h-[420px] w-full lg:h-[calc(100vh-7rem)]">
+            <div className="relative h-[60vh] min-h-[420px] w-full lg:h-[calc(100vh-7rem)]">
               {employees.length === 0 && !isLoading ? (
                 <div className="flex h-full flex-col items-center justify-center gap-2 bg-violet-50/40 text-center">
                   <MapPin className="h-10 w-10 text-violet-300" />
@@ -128,7 +134,18 @@ export default function LiveTrackingPage() {
                   </p>
                 </div>
               ) : (
-                <LiveTrackingMap employees={employees} areas={areas} focusId={focusId} />
+                <>
+                  <LiveTrackingMap employees={employees} areas={areas} focusId={focusId} resetSignal={resetSignal} />
+                  {/* Jump back to the overview of everyone (and clear any focus). */}
+                  <button
+                    type="button"
+                    onClick={resetView}
+                    className="absolute right-3 top-3 z-[1000] flex items-center gap-1.5 rounded-full border border-violet-200 bg-white/95 px-3 py-1.5 text-xs font-semibold text-violet-700 shadow-md backdrop-blur transition-colors hover:bg-violet-50"
+                  >
+                    <Maximize className="h-3.5 w-3.5" />
+                    Reset view
+                  </button>
+                </>
               )}
             </div>
           </Card>

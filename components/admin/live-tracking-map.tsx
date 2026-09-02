@@ -176,6 +176,25 @@ function FollowMap({ employees, hasFocus }: { employees: LiveEmployee[]; hasFocu
   return null
 }
 
+// Re-frame the map around everyone when the admin hits "Reset view". Driven by a
+// changing signal so it fires on demand (not on mount).
+function ResetView({ signal, employees }: { signal: number; employees: LiveEmployee[] }) {
+  const map = useMap()
+  const mounted = useRef(false)
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true
+      return
+    }
+    if (employees.length === 0) return
+    const pts = employees.map((e) => [e.current.latitude, e.current.longitude]) as [number, number][]
+    if (pts.length === 1) map.setView(pts[0], Math.max(map.getZoom(), 15))
+    else map.fitBounds(L.latLngBounds(pts).pad(0.25))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signal])
+  return null
+}
+
 // Fly the map to a chosen employee when the admin clicks them in the side list.
 function FocusEmployee({ id, positions }: { id?: string | null; positions: Map<string, [number, number]> }) {
   const map = useMap()
@@ -192,10 +211,12 @@ export default function LiveTrackingMap({
   employees,
   areas = {},
   focusId,
+  resetSignal = 0,
 }: {
   employees: LiveEmployee[]
   areas?: Record<string, string>
   focusId?: string | null
+  resetSignal?: number
 }) {
   const fallbackCenter: [number, number] = employees[0]
     ? [employees[0].current.latitude, employees[0].current.longitude]
@@ -223,6 +244,7 @@ export default function LiveTrackingMap({
       />
       <FollowMap employees={employees} hasFocus={!!focusId} />
       <FocusEmployee id={focusId} positions={displayPositions} />
+      <ResetView signal={resetSignal} employees={employees} />
 
       {employees.map((e) => {
         const meta = STATUS_META[e.status]
