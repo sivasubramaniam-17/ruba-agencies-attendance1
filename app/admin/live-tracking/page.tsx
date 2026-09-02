@@ -143,6 +143,7 @@ export default function LiveTrackingPage() {
                   {employees.length}
                 </span>
               </CardTitle>
+              <p className="text-xs text-gray-400">Tap an employee to see their route on the map.</p>
             </CardHeader>
             <CardContent className="space-y-2">
               {employees.length === 0 ? (
@@ -154,8 +155,8 @@ export default function LiveTrackingPage() {
                     <button
                       key={e.user.id}
                       type="button"
-                      onClick={() => setFocusId(e.user.id)}
-                      title="Show on map"
+                      onClick={() => setFocusId((cur) => (cur === e.user.id ? null : e.user.id))}
+                      title={focusId === e.user.id ? "Hide route" : "Show route on map"}
                       className={`flex w-full items-center justify-between gap-2 rounded-lg border p-2 text-left transition-colors hover:bg-violet-50 ${
                         focusId === e.user.id ? "border-violet-400 bg-violet-50 ring-1 ring-violet-300" : "border-violet-100"
                       }`}

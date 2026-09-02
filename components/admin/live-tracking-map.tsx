@@ -236,17 +236,19 @@ export default function LiveTrackingMap({
         const accuracyRadius = Math.min(e.current.accuracy ?? 30, 150)
         return (
           <div key={e.user.id}>
-            {trailPts.length > 1 && (
+            {/* Only draw the path for the employee the admin has tapped — keeps
+                the map neat and makes it obvious whose route this is. */}
+            {focusId === e.user.id && trailPts.length > 1 && (
               <>
                 {/* Soft glow underneath, then the crisp rounded line on top — a
                     smooth, flowing route like Uber/Swiggy. */}
                 <Polyline
                   positions={trailPts}
-                  pathOptions={{ color: meta.color, weight: 11, opacity: 0.15, lineCap: "round", lineJoin: "round" }}
+                  pathOptions={{ color: meta.color, weight: 11, opacity: 0.2, lineCap: "round", lineJoin: "round" }}
                 />
                 <Polyline
                   positions={trailPts}
-                  pathOptions={{ color: meta.color, weight: 4.5, opacity: 0.9, lineCap: "round", lineJoin: "round" }}
+                  pathOptions={{ color: meta.color, weight: 5, opacity: 0.95, lineCap: "round", lineJoin: "round" }}
                 />
               </>
             )}
