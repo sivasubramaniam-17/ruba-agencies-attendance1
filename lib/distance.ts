@@ -11,6 +11,11 @@ const MIN_TRAVEL_MPS = 10 / 3.6 // 10 km/h
 // GPS jitter well enough that a stationary employee stays at 0 km (a shorter
 // window lets noise leak back in and inflate a standing person's distance).
 const WINDOW_MS = 5 * 60 * 1000 // 5 minutes
+// The most recent slice of pings is counted "live" (point-to-point) instead of
+// waiting for its 5-min window to close, so a rider's distance climbs right away.
+// A stricter speed gate keeps this responsive part jitter-free for a stopped user.
+const TAIL_MS = 3 * 60 * 1000 // 3 minutes
+const TAIL_MIN_MPS = 15 / 3.6 // ~15 km/h — clear riding only, in the live tail
 
 export interface PingPoint {
   latitude: number
@@ -28,44 +33,85 @@ export function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: 
   return 2 * R * Math.asin(Math.sqrt(s))
 }
 
-// Metres travelled for one user's time-ordered pings. To beat GPS jitter we
-// average every window into one centroid (noise cancels out), then sum the
-// distance between consecutive centroids — so a person sitting still, whose
-// readings scatter around one spot, ends up with ~0 km. Only segments at genuine
-// travel speed are counted, so walking and jitter don't inflate the total.
-export function distanceMeters(points: PingPoint[]): number {
-  // Drop unreliable fixes (poor accuracy = very noisy cell/wifi location).
-  const good = points.filter((p) => p.accuracy == null || p.accuracy <= MAX_ACCURACY_M)
-  if (good.length < 2) return 0
+interface Centroid {
+  lat: number
+  lng: number
+  tStart: number // window start — used for centroid-to-centroid timing
+  tEnd: number // latest fix in the window — used to connect to the live tail
+}
 
-  // Bucket into windows and take each window's centroid (mean position).
-  const buckets = new Map<number, { sumLat: number; sumLng: number; n: number; t: number }>()
-  for (const p of good) {
-    const key = Math.floor(p.createdAt.getTime() / WINDOW_MS)
+// Average each 5-min window of fixes into one centroid point (noise cancels out).
+function buildCentroids(points: PingPoint[]): Centroid[] {
+  const buckets = new Map<number, { sumLat: number; sumLng: number; n: number; tStart: number; tEnd: number }>()
+  for (const p of points) {
+    const t = p.createdAt.getTime()
+    const key = Math.floor(t / WINDOW_MS)
     const b = buckets.get(key)
     if (b) {
       b.sumLat += p.latitude
       b.sumLng += p.longitude
       b.n++
+      if (t > b.tEnd) b.tEnd = t
     } else {
-      buckets.set(key, { sumLat: p.latitude, sumLng: p.longitude, n: 1, t: key * WINDOW_MS })
+      buckets.set(key, { sumLat: p.latitude, sumLng: p.longitude, n: 1, tStart: key * WINDOW_MS, tEnd: t })
     }
   }
-  const centroids = Array.from(buckets.values())
-    .sort((a, b) => a.t - b.t)
-    .map((b) => ({ lat: b.sumLat / b.n, lng: b.sumLng / b.n, t: b.t }))
+  return Array.from(buckets.values())
+    .sort((a, b) => a.tStart - b.tStart)
+    .map((b) => ({ lat: b.sumLat / b.n, lng: b.sumLng / b.n, tStart: b.tStart, tEnd: b.tEnd }))
+}
+
+// Metres travelled for one user's time-ordered pings. Older fixes are averaged
+// into 5-min centroids (so a person sitting still, whose readings scatter around
+// one spot, ends up with ~0 km), while the most recent few minutes are counted
+// point-to-point so a moving rider's distance climbs live instead of waiting for
+// the window to close. Only genuine travel speed is counted in either part.
+export function distanceMeters(points: PingPoint[]): number {
+  // Drop unreliable fixes (poor accuracy = very noisy cell/wifi location).
+  const good = points
+    .filter((p) => p.accuracy == null || p.accuracy <= MAX_ACCURACY_M)
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+  if (good.length < 2) return 0
+
+  const tailCut = good[good.length - 1].createdAt.getTime() - TAIL_MS
+  const settled = good.filter((p) => p.createdAt.getTime() < tailCut)
+  const tail = good.filter((p) => p.createdAt.getTime() >= tailCut)
 
   let meters = 0
+
+  // --- Settled part: jitter-cancelling 5-min centroids ---
+  const centroids = buildCentroids(settled)
   for (let i = 1; i < centroids.length; i++) {
     const a = centroids[i - 1]
     const c = centroids[i]
     const d = haversineMeters(a.lat, a.lng, c.lat, c.lng)
     if (d < NOISE_FLOOR_M) continue // residual jitter between windows — ignore
-    const dt = Math.max(1, (c.t - a.t) / 1000)
+    const dt = Math.max(1, (c.tStart - a.tStart) / 1000)
     const speed = d / dt
-    // Count only genuine travel (bike/vehicle), not walking or jitter.
     if (speed >= MIN_TRAVEL_MPS && speed <= MAX_SPEED_MPS) meters += d
   }
+
+  // --- Live tail: recent fixes, point-to-point, anchored to the last centroid ---
+  const lastCentroid = centroids[centroids.length - 1]
+  let anchor = lastCentroid
+    ? { lat: lastCentroid.lat, lng: lastCentroid.lng, t: lastCentroid.tEnd }
+    : tail.length
+      ? { lat: tail[0].latitude, lng: tail[0].longitude, t: tail[0].createdAt.getTime() }
+      : null
+  const startIdx = lastCentroid ? 0 : 1
+  for (let i = startIdx; i < tail.length; i++) {
+    const p = tail[i]
+    if (!anchor) break
+    const d = haversineMeters(anchor.lat, anchor.lng, p.latitude, p.longitude)
+    if (d < NOISE_FLOOR_M) continue // jitter around a standing spot — ignore
+    const dt = Math.max(1, (p.createdAt.getTime() - anchor.t) / 1000)
+    const speed = d / dt
+    // Stricter speed gate here: point-to-point is noisier than centroids, so only
+    // clear riding counts — a stopped person's recent jitter stays at 0.
+    if (speed >= TAIL_MIN_MPS && speed <= MAX_SPEED_MPS) meters += d
+    anchor = { lat: p.latitude, lng: p.longitude, t: p.createdAt.getTime() }
+  }
+
   return meters
 }
 

@@ -35,11 +35,11 @@ export default function LiveTrackingPage() {
     { refreshInterval: 5000, revalidateOnFocus: true },
   )
 
-  // Distance-travelled-today per employee. Kept on a slower 60s beat — it's the
-  // heavier (full-day) query and the distance is a 5-min-settled figure anyway.
+  // Distance-travelled-today per employee. 20s beat so the live tail (recent
+  // riding) shows up quickly; SWR pauses it when the tab is hidden.
   const { data: statsData } = useSWR<{ distanceByUser: Record<string, number>; teamKm: number }>(
     isAdminOrHr ? "/api/location/stats" : null,
-    { refreshInterval: 60000 },
+    { refreshInterval: 20000 },
   )
   const distanceByUser = statsData?.distanceByUser ?? {}
   const teamKm = statsData?.teamKm ?? 0
