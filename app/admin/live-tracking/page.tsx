@@ -8,7 +8,7 @@ import useSWR from "swr"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { MapPin, Users, Radio, Maximize } from "lucide-react"
+import { MapPin, Users, Radio, Maximize, Play, Pause, X, Clock } from "lucide-react"
 import { type LiveEmployee, STATUS_META } from "@/components/admin/live-status"
 import { reverseGeocode } from "@/lib/reverse-geocode"
 
@@ -54,6 +54,70 @@ export default function LiveTrackingPage() {
   }
 
   const employees = data?.employees ?? []
+
+  // ---- Day-route replay ("rewind and watch where they went") ----
+  const REPLAY_COLOR = "#7c3aed"
+  interface ReplayStop { lat: number; lng: number; arrive: number; leave: number; minutes: number }
+  const [replayUser, setReplayUser] = useState<{ id: string; name: string; initials: string } | null>(null)
+  const [replayPts, setReplayPts] = useState<[number, number][]>([])
+  const [replayTimes, setReplayTimes] = useState<number[]>([])
+  const [replayStops, setReplayStops] = useState<ReplayStop[]>([])
+  const [replayIdx, setReplayIdx] = useState(0)
+  const [replayPlaying, setReplayPlaying] = useState(false)
+  const [replaySpeed, setReplaySpeed] = useState(4)
+  const [replayLoading, setReplayLoading] = useState(false)
+
+  const startReplay = async (e: LiveEmployee) => {
+    setFocusId(null)
+    setReplayLoading(true)
+    setReplayUser({
+      id: e.user.id,
+      name: `${e.user.firstName} ${e.user.lastName}`,
+      initials: `${e.user.firstName?.[0] ?? ""}${e.user.lastName?.[0] ?? ""}`.toUpperCase(),
+    })
+    try {
+      const res = await fetch(`/api/location/path?userId=${e.user.id}`)
+      const d = await res.json()
+      const pts = (d.points ?? []).map((p: { lat: number; lng: number }) => [p.lat, p.lng]) as [number, number][]
+      setReplayPts(pts)
+      setReplayTimes((d.points ?? []).map((p: { t: number }) => p.t))
+      setReplayStops(d.stops ?? [])
+      setReplayIdx(0)
+      setReplayPlaying(pts.length > 1)
+    } catch {
+      setReplayPts([])
+    } finally {
+      setReplayLoading(false)
+    }
+  }
+
+  const closeReplay = () => {
+    setReplayUser(null)
+    setReplayPts([])
+    setReplayTimes([])
+    setReplayStops([])
+    setReplayPlaying(false)
+    setReplayIdx(0)
+  }
+
+  // Advance the replay while playing — step `speed` points every 120ms.
+  useEffect(() => {
+    if (!replayPlaying || replayPts.length < 2) return
+    const id = setInterval(() => {
+      setReplayIdx((i) => {
+        const next = i + replaySpeed
+        if (next >= replayPts.length - 1) {
+          setReplayPlaying(false)
+          return replayPts.length - 1
+        }
+        return next
+      })
+    }, 120)
+    return () => clearInterval(id)
+  }, [replayPlaying, replaySpeed, replayPts.length])
+
+  const replayClock = (t?: number) =>
+    t ? new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"
 
   // Resolve a human-readable area name for each live employee (cached; barely
   // hits the network) so the admin can read exactly where they're standing.
@@ -124,7 +188,7 @@ export default function LiveTrackingPage() {
               employee list scrolls beside it. */}
           <Card className="overflow-hidden border-violet-200 shadow-lg lg:col-span-3 lg:sticky lg:top-20 lg:self-start">
             <div className="relative h-[60vh] min-h-[420px] w-full lg:h-[calc(100vh-7rem)]">
-              {employees.length === 0 && !isLoading ? (
+              {employees.length === 0 && !isLoading && !replayUser ? (
                 <div className="flex h-full flex-col items-center justify-center gap-2 bg-violet-50/40 text-center">
                   <MapPin className="h-10 w-10 text-violet-300" />
                   <p className="font-medium text-violet-900">No one is sharing location right now</p>
@@ -135,20 +199,166 @@ export default function LiveTrackingPage() {
                 </div>
               ) : (
                 <>
-                  <LiveTrackingMap employees={employees} areas={areas} focusId={focusId} resetSignal={resetSignal} />
-                  {/* Jump back to the overview of everyone (and clear any focus). */}
-                  <button
-                    type="button"
-                    onClick={resetView}
-                    className="absolute right-3 top-3 z-[1000] flex items-center gap-1.5 rounded-full border border-violet-200 bg-white/95 px-3 py-1.5 text-xs font-semibold text-violet-700 shadow-md backdrop-blur transition-colors hover:bg-violet-50"
-                  >
-                    <Maximize className="h-3.5 w-3.5" />
-                    Reset view
-                  </button>
+                  <LiveTrackingMap
+                    employees={employees}
+                    areas={areas}
+                    focusId={focusId}
+                    resetSignal={resetSignal}
+                    replay={
+                      replayUser
+                        ? { points: replayPts, index: replayIdx, label: replayUser.initials, color: REPLAY_COLOR, stops: replayStops }
+                        : null
+                    }
+                  />
+                  {/* Reset view — hidden while replaying (replay has its own bar). */}
+                  {!replayUser && (
+                    <button
+                      type="button"
+                      onClick={resetView}
+                      className="absolute right-3 top-3 z-[1000] flex items-center gap-1.5 rounded-full border border-violet-200 bg-white/95 px-3 py-1.5 text-xs font-semibold text-violet-700 shadow-md backdrop-blur transition-colors hover:bg-violet-50"
+                    >
+                      <Maximize className="h-3.5 w-3.5" />
+                      Reset view
+                    </button>
+                  )}
+
+                  {/* Replay control bar */}
+                  {replayUser && (
+                    <div className="absolute inset-x-3 bottom-3 z-[1000] rounded-xl border border-violet-200 bg-white/95 p-3 shadow-lg backdrop-blur">
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: REPLAY_COLOR }}>
+                          {replayUser.initials}
+                        </span>
+                        <span className="truncate text-sm font-semibold text-violet-900">{replayUser.name}</span>
+                        <span className="ml-1 inline-flex items-center gap-1 text-xs text-gray-500">
+                          <Clock className="h-3 w-3" />
+                          {replayLoading ? "Loading…" : replayClock(replayTimes[replayIdx])}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={closeReplay}
+                          className="ml-auto rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                          title="Exit replay"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      {replayPts.length > 1 ? (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (replayIdx >= replayPts.length - 1) setReplayIdx(0)
+                                setReplayPlaying((p) => !p)
+                              }}
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white hover:bg-violet-700"
+                            >
+                              {replayPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                            </button>
+                            <input
+                              type="range"
+                              min={0}
+                              max={replayPts.length - 1}
+                              value={replayIdx}
+                              onChange={(ev) => {
+                                setReplayPlaying(false)
+                                setReplayIdx(Number(ev.target.value))
+                              }}
+                              className="h-1.5 w-full cursor-pointer accent-violet-600"
+                            />
+                          </div>
+                          <div className="mt-2 flex items-center justify-between">
+                            <span className="text-[11px] text-gray-500">
+                              {replayClock(replayTimes[0])} → {replayClock(replayTimes[replayTimes.length - 1])}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              {[1, 2, 4, 8].map((s) => (
+                                <button
+                                  key={s}
+                                  type="button"
+                                  onClick={() => setReplaySpeed(s)}
+                                  className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                                    replaySpeed === s ? "bg-violet-600 text-white" : "bg-violet-50 text-violet-700 hover:bg-violet-100"
+                                  }`}
+                                >
+                                  {s}×
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-xs text-gray-500">
+                          {replayLoading ? "Loading route…" : "No movement recorded today for this employee."}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </div>
           </Card>
+
+          {/* Replay stops timeline — where they arrived and how long they stayed. */}
+          {replayUser && (
+            <Card className="border-violet-200 shadow-lg">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base text-violet-900">
+                  <Play className="h-4 w-4 text-violet-600" />
+                  Replay · {replayUser.name}
+                  <button
+                    type="button"
+                    onClick={closeReplay}
+                    className="ml-auto rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                    title="Exit replay"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </CardTitle>
+                <p className="text-xs text-gray-400">Today’s route. Tap a stop to jump there.</p>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {replayStops.length === 0 ? (
+                  <p className="text-sm text-gray-500">
+                    {replayLoading ? "Loading…" : "No stops of 5+ minutes recorded today."}
+                  </p>
+                ) : (
+                  replayStops.map((s, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => {
+                        // Jump the scrubber to the point nearest this stop's arrival.
+                        let best = 0
+                        let bestDiff = Infinity
+                        replayTimes.forEach((t, idx) => {
+                          const diff = Math.abs(t - s.arrive)
+                          if (diff < bestDiff) {
+                            bestDiff = diff
+                            best = idx
+                          }
+                        })
+                        setReplayPlaying(false)
+                        setReplayIdx(best)
+                      }}
+                      className="flex w-full items-center gap-3 rounded-lg border border-violet-100 p-2 text-left hover:bg-violet-50"
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-400 text-xs font-bold text-gray-900">
+                        {i + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-violet-900">Stayed {s.minutes} min</p>
+                        <p className="text-xs text-gray-500">
+                          {replayClock(s.arrive)} → {replayClock(s.leave)}
+                        </p>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Live employee list — grows with the page; the sticky map stays put. */}
           <Card className="border-violet-200 shadow-lg">
@@ -169,12 +379,13 @@ export default function LiveTrackingPage() {
                 employees.map((e) => {
                   const meta = STATUS_META[e.status]
                   return (
-                    <button
+                    <div
                       key={e.user.id}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setFocusId((cur) => (cur === e.user.id ? null : e.user.id))}
                       title={focusId === e.user.id ? "Hide route" : "Show route on map"}
-                      className={`flex w-full items-center justify-between gap-2 rounded-lg border p-2 text-left transition-colors hover:bg-violet-50 ${
+                      className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border p-2 text-left transition-colors hover:bg-violet-50 ${
                         focusId === e.user.id ? "border-violet-400 bg-violet-50 ring-1 ring-violet-300" : "border-violet-100"
                       }`}
                     >
@@ -208,6 +419,17 @@ export default function LiveTrackingPage() {
                             🚶 {distanceByUser[e.user.id]} km travelled today
                           </p>
                         )}
+                        <button
+                          type="button"
+                          onClick={(ev) => {
+                            ev.stopPropagation()
+                            startReplay(e)
+                          }}
+                          className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-violet-600 px-2.5 py-1 text-[10px] font-semibold text-white transition-colors hover:bg-violet-700"
+                        >
+                          <Play className="h-3 w-3" />
+                          Replay today
+                        </button>
                       </div>
                       <div className="shrink-0 text-right">
                         <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-green-500" />
@@ -218,7 +440,7 @@ export default function LiveTrackingPage() {
                           })}
                         </p>
                       </div>
-                    </button>
+                    </div>
                   )
                 })
               )}

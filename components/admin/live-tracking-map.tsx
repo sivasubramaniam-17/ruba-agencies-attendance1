@@ -195,6 +195,18 @@ function ResetView({ signal, employees }: { signal: number; employees: LiveEmplo
   return null
 }
 
+// Frame the map around a replay route when it first loads.
+function ReplayFit({ points }: { points: [number, number][] }) {
+  const map = useMap()
+  const key = points.length ? `${points.length}:${points[0][0]},${points[0][1]}` : ""
+  useEffect(() => {
+    if (points.length === 1) map.setView(points[0], Math.max(map.getZoom(), 15))
+    else if (points.length > 1) map.fitBounds(L.latLngBounds(points).pad(0.2))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+  return null
+}
+
 // Fly the map to a chosen employee when the admin clicks them in the side list.
 function FocusEmployee({ id, positions }: { id?: string | null; positions: Map<string, [number, number]> }) {
   const map = useMap()
@@ -212,11 +224,19 @@ export default function LiveTrackingMap({
   areas = {},
   focusId,
   resetSignal = 0,
+  replay,
 }: {
   employees: LiveEmployee[]
   areas?: Record<string, string>
   focusId?: string | null
   resetSignal?: number
+  replay?: {
+    points: [number, number][]
+    index: number
+    label: string
+    color: string
+    stops?: { lat: number; lng: number; arrive: number; leave: number; minutes: number }[]
+  } | null
 }) {
   const fallbackCenter: [number, number] = employees[0]
     ? [employees[0].current.latitude, employees[0].current.longitude]
@@ -242,11 +262,52 @@ export default function LiveTrackingMap({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         maxZoom={19}
       />
-      <FollowMap employees={employees} hasFocus={!!focusId} />
-      <FocusEmployee id={focusId} positions={displayPositions} />
-      <ResetView signal={resetSignal} employees={employees} />
+      {replay ? (
+        <>
+          {/* Replay mode: draw the full route faint, the travelled part bold, and
+              a marker gliding along it as the scrubber advances. */}
+          <ReplayFit points={replay.points} />
+          {replay.points.length > 1 && (
+            <>
+              <Polyline
+                positions={replay.points}
+                pathOptions={{ color: replay.color, weight: 4, opacity: 0.25, lineCap: "round", lineJoin: "round" }}
+              />
+              <Polyline
+                positions={replay.points.slice(0, replay.index + 1)}
+                pathOptions={{ color: replay.color, weight: 5, opacity: 0.95, lineCap: "round", lineJoin: "round" }}
+              />
+            </>
+          )}
+          {/* Stop markers — where they stayed a while, with arrive/leave times. */}
+          {(replay.stops ?? []).map((s, i) => (
+            <Circle
+              key={`stop-${i}`}
+              center={[s.lat, s.lng]}
+              radius={22}
+              pathOptions={{ color: "#111827", weight: 2, fillColor: "#f59e0b", fillOpacity: 0.85 }}
+            >
+              <Popup>
+                <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+                  <div style={{ fontWeight: 700 }}>Stop {i + 1} · {s.minutes} min</div>
+                  <div>Arrived {fmtTime(new Date(s.arrive).toISOString())}</div>
+                  <div>Left {fmtTime(new Date(s.leave).toISOString())}</div>
+                </div>
+              </Popup>
+            </Circle>
+          ))}
+          {replay.points[replay.index] && (
+            <AnimatedMarker position={replay.points[replay.index]} icon={makeIcon(replay.label, replay.color)} />
+          )}
+        </>
+      ) : (
+        <FollowMap employees={employees} hasFocus={!!focusId} />
+      )}
+      {!replay && <FocusEmployee id={focusId} positions={displayPositions} />}
+      {!replay && <ResetView signal={resetSignal} employees={employees} />}
 
-      {employees.map((e) => {
+      {!replay &&
+        employees.map((e) => {
         const meta = STATUS_META[e.status]
         const pos: [number, number] = [e.current.latitude, e.current.longitude]
         const displayPos: [number, number] = displayPositions.get(e.user.id) ?? pos
