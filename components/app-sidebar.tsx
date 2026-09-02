@@ -43,6 +43,7 @@ import {
   ChevronDown,
   MapPin,
   Route,
+  PlayCircle,
 } from "lucide-react"
 import { signOut } from "next-auth/react"
 import Link from "next/link"
@@ -117,6 +118,11 @@ const adminMenuItems = [
     title: "Travel History",
     url: "/admin/travel-history",
     icon: Route,
+  },
+  {
+    title: "Route Replay",
+    url: "/admin/replay",
+    icon: PlayCircle,
   },
   {
     title: "Notifications",
