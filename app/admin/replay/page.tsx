@@ -9,6 +9,7 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { PageHeader } from "@/components/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PlayCircle, Play, Pause, Clock, CalendarDays } from "lucide-react"
+import { reverseGeocode } from "@/lib/reverse-geocode"
 
 const LiveTrackingMap = dynamic(() => import("@/components/admin/live-tracking-map"), {
   ssr: false,
@@ -66,6 +67,27 @@ export default function RouteReplayPage() {
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(4)
   const [loading, setLoading] = useState(false)
+  const [stopAreas, setStopAreas] = useState<Record<number, string>>({})
+
+  // Look up a place name for each stop (cached; barely hits the network).
+  useEffect(() => {
+    let cancelled = false
+    setStopAreas({})
+    ;(async () => {
+      for (let i = 0; i < stops.length; i++) {
+        const name = await reverseGeocode(stops[i].lat, stops[i].lng)
+        if (cancelled) return
+        if (name) setStopAreas((prev) => ({ ...prev, [i]: name }))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [stops])
+
+  const stopsWithArea = useMemo(() => stops.map((s, i) => ({ ...s, area: stopAreas[i] })), [stops, stopAreas])
+  const clockExact = (t?: number) =>
+    t ? new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—"
 
   // Load the route whenever the employee or date changes.
   useEffect(() => {
@@ -147,7 +169,9 @@ export default function RouteReplayPage() {
             <div className="relative h-[60vh] min-h-[420px] w-full lg:h-[calc(100vh-7rem)]">
               <LiveTrackingMap
                 employees={[]}
-                replay={selected ? { points: pts, index: idx, label: initials, color: REPLAY_COLOR, stops } : null}
+                replay={
+                  selected ? { points: pts, index: idx, label: initials, color: REPLAY_COLOR, stops: stopsWithArea } : null
+                }
               />
               {selected && (
                 <div className="absolute inset-x-3 bottom-3 z-[1000] rounded-xl border border-violet-200 bg-white/95 p-3 shadow-lg backdrop-blur">
@@ -287,7 +311,7 @@ export default function RouteReplayPage() {
                 {stops.length === 0 ? (
                   <p className="text-sm text-gray-500">{loading ? "Loading…" : "No stops of 5+ minutes."}</p>
                 ) : (
-                  stops.map((s, i) => (
+                  stopsWithArea.map((s, i) => (
                     <button
                       key={i}
                       type="button"
@@ -304,16 +328,18 @@ export default function RouteReplayPage() {
                         setPlaying(false)
                         setIdx(best)
                       }}
-                      className="flex w-full items-center gap-3 rounded-lg border border-violet-100 p-2 text-left hover:bg-violet-50"
+                      className="flex w-full items-start gap-3 rounded-lg border border-violet-100 p-2 text-left hover:bg-violet-50"
                     >
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-400 text-xs font-bold text-gray-900">
+                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-400 text-xs font-bold text-gray-900">
                         {i + 1}
                       </span>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-violet-900">Stayed {s.minutes} min</p>
-                        <p className="text-xs text-gray-500">
-                          {clock(s.arrive)} → {clock(s.leave)}
+                        <p className="truncate text-sm font-medium text-violet-900">
+                          {s.area || "Locating place…"}
                         </p>
+                        <p className="text-xs text-gray-600">Stayed {s.minutes} min</p>
+                        <p className="text-[11px] text-gray-500">🟢 Arrived {clockExact(s.arrive)}</p>
+                        <p className="text-[11px] text-gray-500">🔴 Left {clockExact(s.leave)}</p>
                       </div>
                     </button>
                   ))

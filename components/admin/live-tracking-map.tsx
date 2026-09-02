@@ -138,6 +138,10 @@ function makeIcon(initials: string, color: string) {
 const fmtTime = (iso: string | null) =>
   iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"
 
+// Exact time (to the second) for stop arrival/departure.
+const fmtExact = (ms: number) =>
+  new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+
 // Frame the map around everyone once on first load, and again only when someone
 // NEW joins — never on a routine refresh, and never while the admin has focused a
 // person (so clicking a card isn't undone by the next poll).
@@ -235,7 +239,7 @@ export default function LiveTrackingMap({
     index: number
     label: string
     color: string
-    stops?: { lat: number; lng: number; arrive: number; leave: number; minutes: number }[]
+    stops?: { lat: number; lng: number; arrive: number; leave: number; minutes: number; area?: string }[]
   } | null
 }) {
   const fallbackCenter: [number, number] = employees[0]
@@ -288,10 +292,11 @@ export default function LiveTrackingMap({
               pathOptions={{ color: "#111827", weight: 2, fillColor: "#f59e0b", fillOpacity: 0.85 }}
             >
               <Popup>
-                <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-                  <div style={{ fontWeight: 700 }}>Stop {i + 1} · {s.minutes} min</div>
-                  <div>Arrived {fmtTime(new Date(s.arrive).toISOString())}</div>
-                  <div>Left {fmtTime(new Date(s.leave).toISOString())}</div>
+                <div style={{ fontSize: 12, lineHeight: 1.6, minWidth: 170 }}>
+                  <div style={{ fontWeight: 700 }}>Stop {i + 1} · stayed {s.minutes} min</div>
+                  {s.area && <div style={{ color: "#7c3aed", fontWeight: 600 }}>📍 {s.area}</div>}
+                  <div>🟢 Arrived {fmtExact(s.arrive)}</div>
+                  <div>🔴 Left {fmtExact(s.leave)}</div>
                 </div>
               </Popup>
             </Circle>
