@@ -86,7 +86,7 @@ export default function LiveTrackingPage() {
               Live Tracking
             </h1>
             <p className="text-sm text-gray-500">
-              Employees currently sharing their location (updates every ~25s).
+              Employees currently sharing their location · updates live
             </p>
           </div>
           <div className="flex w-fit flex-wrap items-center gap-2">
@@ -110,10 +110,10 @@ export default function LiveTrackingPage() {
           ))}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-4">
+        <div className="grid gap-4 lg:h-[74vh] lg:grid-cols-4">
           {/* Map */}
-          <Card className="overflow-hidden border-violet-200 shadow-lg lg:col-span-3">
-            <div className="h-[60vh] min-h-[420px] w-full">
+          <Card className="overflow-hidden border-violet-200 shadow-lg lg:col-span-3 lg:h-full">
+            <div className="h-[60vh] min-h-[420px] w-full lg:h-full lg:min-h-0">
               {employees.length === 0 && !isLoading ? (
                 <div className="flex h-full flex-col items-center justify-center gap-2 bg-violet-50/40 text-center">
                   <MapPin className="h-10 w-10 text-violet-300" />
@@ -130,14 +130,17 @@ export default function LiveTrackingPage() {
           </Card>
 
           {/* Live employee list */}
-          <Card className="border-violet-200 shadow-lg">
+          <Card className="flex flex-col border-violet-200 shadow-lg lg:h-full">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base text-violet-900">
                 <Users className="h-4 w-4 text-violet-600" />
                 Active Employees
+                <span className="ml-auto rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700">
+                  {employees.length}
+                </span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="flex-1 space-y-2 overflow-y-auto">
               {employees.length === 0 ? (
                 <p className="text-sm text-gray-500">No active employees.</p>
               ) : (
@@ -169,7 +172,9 @@ export default function LiveTrackingPage() {
                         )}
                         <p className="mt-1 flex items-start gap-1 text-[11px] text-gray-600">
                           <MapPin className="mt-[1px] h-3 w-3 shrink-0 text-violet-500" />
-                          <span className="truncate">{areas[e.user.id] || "Locating area…"}</span>
+                          <span className="truncate" title={areas[e.user.id] || undefined}>
+                            {areas[e.user.id] || "Locating area…"}
+                          </span>
                         </p>
                         {distanceByUser[e.user.id] != null && (
                           <p className="mt-1 text-[11px] font-medium text-violet-700">
