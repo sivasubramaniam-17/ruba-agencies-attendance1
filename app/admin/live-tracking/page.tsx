@@ -113,10 +113,11 @@ export default function LiveTrackingPage() {
           ))}
         </div>
 
-        <div className="grid gap-4 lg:h-[74vh] lg:grid-cols-4">
-          {/* Map */}
-          <Card className="overflow-hidden border-violet-200 shadow-lg lg:col-span-3 lg:h-full">
-            <div className="h-[60vh] min-h-[420px] w-full lg:h-full lg:min-h-0">
+        <div className="grid gap-4 lg:grid-cols-4 lg:items-start">
+          {/* Map — sticks just below the header so it stays in view while the
+              employee list scrolls beside it. */}
+          <Card className="overflow-hidden border-violet-200 shadow-lg lg:col-span-3 lg:sticky lg:top-20 lg:self-start">
+            <div className="h-[60vh] min-h-[420px] w-full lg:h-[calc(100vh-7rem)]">
               {employees.length === 0 && !isLoading ? (
                 <div className="flex h-full flex-col items-center justify-center gap-2 bg-violet-50/40 text-center">
                   <MapPin className="h-10 w-10 text-violet-300" />
@@ -132,8 +133,8 @@ export default function LiveTrackingPage() {
             </div>
           </Card>
 
-          {/* Live employee list */}
-          <Card className="flex flex-col border-violet-200 shadow-lg lg:h-full">
+          {/* Live employee list — grows with the page; the sticky map stays put. */}
+          <Card className="border-violet-200 shadow-lg">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base text-violet-900">
                 <Users className="h-4 w-4 text-violet-600" />
@@ -143,7 +144,7 @@ export default function LiveTrackingPage() {
                 </span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 space-y-2 overflow-y-auto">
+            <CardContent className="space-y-2">
               {employees.length === 0 ? (
                 <p className="text-sm text-gray-500">No active employees.</p>
               ) : (
