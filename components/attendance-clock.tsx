@@ -76,24 +76,36 @@ export function AttendanceClock() {
       setLocation("Geolocation not supported")
       return
     }
+    const onOk = (position: GeolocationPosition) => {
+      const { latitude, longitude } = position.coords
+      setLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`)
+    }
+    const labelFor = (error: GeolocationPositionError | undefined) => {
+      const messages: Record<number, string> = {
+        1: "Location permission denied",
+        2: "Location unavailable",
+        3: "Location request timed out",
+      }
+      return messages[error?.code ?? 0] || "Location unavailable"
+    }
+    // First try a precise GPS fix. Indoors that can time out, so on any failure
+    // fall back to fast coarse (cell/Wi-Fi) location and accept a recent cached
+    // fix — the same reason Live Sharing gets a position while this used to fail.
+    // Location is non-fatal: check-in still works without it.
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords
-        setLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`)
+      onOk,
+      () => {
+        navigator.geolocation.getCurrentPosition(
+          onOk,
+          (error) => {
+            const label = labelFor(error)
+            console.warn(`Attendance location: ${label} (code ${error?.code ?? "?"}: ${error?.message ?? ""})`)
+            setLocation(label)
+          },
+          { enableHighAccuracy: false, timeout: 25000, maximumAge: 60000 },
+        )
       },
-      (error) => {
-        // GeolocationPositionError doesn't serialize well; map the code to a
-        // readable status. This is non-fatal — check-in still works without it.
-        const messages: Record<number, string> = {
-          1: "Location permission denied",
-          2: "Location unavailable",
-          3: "Location request timed out",
-        }
-        const label = messages[error?.code] || "Location unavailable"
-        console.warn(`Attendance location: ${label} (code ${error?.code ?? "?"}: ${error?.message ?? ""})`)
-        setLocation(label)
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 },
     )
   }
 
