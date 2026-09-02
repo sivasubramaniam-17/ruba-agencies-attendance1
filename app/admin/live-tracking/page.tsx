@@ -66,30 +66,47 @@ export default function LiveTrackingPage() {
   const [replayPlaying, setReplayPlaying] = useState(false)
   const [replaySpeed, setReplaySpeed] = useState(4)
   const [replayLoading, setReplayLoading] = useState(false)
+  const todayStr = new Date().toISOString().split("T")[0]
+  const [replayDate, setReplayDate] = useState(todayStr)
 
-  const startReplay = async (e: LiveEmployee) => {
+  const startReplay = (e: LiveEmployee) => {
     setFocusId(null)
-    setReplayLoading(true)
+    setReplayDate(todayStr)
     setReplayUser({
       id: e.user.id,
       name: `${e.user.firstName} ${e.user.lastName}`,
       initials: `${e.user.firstName?.[0] ?? ""}${e.user.lastName?.[0] ?? ""}`.toUpperCase(),
     })
-    try {
-      const res = await fetch(`/api/location/path?userId=${e.user.id}`)
-      const d = await res.json()
-      const pts = (d.points ?? []).map((p: { lat: number; lng: number }) => [p.lat, p.lng]) as [number, number][]
-      setReplayPts(pts)
-      setReplayTimes((d.points ?? []).map((p: { t: number }) => p.t))
-      setReplayStops(d.stops ?? [])
-      setReplayIdx(0)
-      setReplayPlaying(pts.length > 1)
-    } catch {
-      setReplayPts([])
-    } finally {
-      setReplayLoading(false)
-    }
   }
+
+  // Load the route whenever the replayed employee or the chosen date changes.
+  useEffect(() => {
+    if (!replayUser) return
+    let cancelled = false
+    setReplayLoading(true)
+    setReplayPlaying(false)
+    fetch(`/api/location/path?userId=${replayUser.id}&date=${replayDate}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return
+        const pts = (d.points ?? []).map((p: { lat: number; lng: number }) => [p.lat, p.lng]) as [number, number][]
+        setReplayPts(pts)
+        setReplayTimes((d.points ?? []).map((p: { t: number }) => p.t))
+        setReplayStops(d.stops ?? [])
+        setReplayIdx(0)
+        setReplayPlaying(pts.length > 1)
+      })
+      .catch(() => {
+        if (!cancelled) setReplayPts([])
+      })
+      .finally(() => {
+        if (!cancelled) setReplayLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replayUser?.id, replayDate])
 
   const closeReplay = () => {
     setReplayUser(null)
@@ -316,7 +333,18 @@ export default function LiveTrackingPage() {
                     <X className="h-4 w-4" />
                   </button>
                 </CardTitle>
-                <p className="text-xs text-gray-400">Today’s route. Tap a stop to jump there.</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <label className="text-xs text-gray-500">Day</label>
+                  <input
+                    type="date"
+                    value={replayDate}
+                    max={todayStr}
+                    onChange={(ev) => setReplayDate(ev.target.value)}
+                    className="rounded-md border border-violet-200 px-2 py-1 text-xs"
+                  />
+                  {replayDate === todayStr && <span className="text-[10px] font-semibold text-green-600">Today</span>}
+                </div>
+                <p className="mt-1 text-xs text-gray-400">Tap a stop to jump there.</p>
               </CardHeader>
               <CardContent className="space-y-2">
                 {replayStops.length === 0 ? (

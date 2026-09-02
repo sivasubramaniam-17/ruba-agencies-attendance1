@@ -37,6 +37,7 @@ model User {
   approvedLateRequests LateApprovalRequest[] @relation("ApprovedBy")
   locationPings        LocationPing[]
   dailyDistances       DailyDistance[]
+  dailyRoutes          DailyRoute[]
 
   @@map("users")
 }
@@ -53,6 +54,26 @@ model DailyDistance {
   @@unique([userId, date])
   @@index([date])
   @@map("daily_distances")
+}
+
+// Compact, replay-ready route for one employee for one day — a downsampled path
+// and detected stops, stored so past days can be replayed cheaply after the raw
+// pings are pruned (24h). Far smaller than keeping every raw ping.
+model DailyRoute {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime // the day (UTC midnight)
+  points    Json // [{ lat, lng, t }]
+  stops     Json // [{ lat, lng, arrive, leave, minutes }]
+  startT    Float? // ms epoch (fits exactly in a double)
+  endT      Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([date])
+  @@map("daily_routes")
 }
 
 model LocationPing {
