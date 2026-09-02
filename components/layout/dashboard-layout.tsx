@@ -13,6 +13,9 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { usePathname } from "next/navigation"
+import Link from "next/link"
+import { useSession } from "next-auth/react"
+import useSWR from "swr"
 import { Bell, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -22,8 +25,21 @@ interface DashboardLayoutProps {
   children: React.ReactNode
 }
 
+interface HeaderNotification {
+  read: boolean
+}
+
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
+  const { data: session } = useSession()
+  const isAdminOrHr = session?.user?.role === "ADMIN" || session?.user?.role === "HR"
+
+  // Live unread count for the header bell (admin/HR only).
+  const { data: notifData } = useSWR<{ notifications: HeaderNotification[] }>(
+    isAdminOrHr ? "/api/notifications" : null,
+    { refreshInterval: 60000 },
+  )
+  const unreadCount = notifData?.notifications?.filter((n) => !n.read).length ?? 0
 
   const getBreadcrumbs = () => {
     const segments = pathname.split("/").filter(Boolean)
@@ -86,17 +102,26 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Notifications */}
           <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative rounded-full text-violet-600 hover:bg-violet-50"
-            >
-              <Bell className="h-5 w-5" />
-              <span className="absolute right-1.5 top-1.5 flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-              </span>
-            </Button>
+            {isAdminOrHr && (
+              <Button
+                asChild
+                variant="ghost"
+                size="icon"
+                className="relative rounded-full text-violet-600 hover:bg-violet-50"
+              >
+                <Link href="/admin/notifications" aria-label="Notifications">
+                  <Bell className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex min-w-[16px] items-center justify-center">
+                      <span className="absolute inline-flex h-4 w-4 animate-ping rounded-full bg-red-400 opacity-60" />
+                      <span className="relative inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    </span>
+                  )}
+                </Link>
+              </Button>
+            )}
           </div>
 
         </header>
