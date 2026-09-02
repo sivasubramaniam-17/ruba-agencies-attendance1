@@ -32,6 +32,51 @@ function smoothPath(pts: [number, number][], samplesPerSegment = 14): [number, n
   return out
 }
 
+// Metres between two lat/lng points (for grouping people who share a spot).
+function metersBetween(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6371000
+  const toRad = (d: number) => (d * Math.PI) / 180
+  const dLat = toRad(bLat - aLat)
+  const dLng = toRad(bLng - aLng)
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(s))
+}
+
+// When several employees are at (nearly) the same place their pins stack and you
+// can't tell them apart. Fan each cluster out onto a small ring around the shared
+// spot so every initialed pin is visible and clickable. Returns a display
+// position per employee id; solo employees keep their exact position.
+const CLUSTER_RADIUS_M = 45 // people within this of each other are "same spot"
+const FAN_RADIUS_DEG = 0.0002 // ~22m ring the fanned pins sit on
+function fanOutPositions(employees: LiveEmployee[]): Map<string, [number, number]> {
+  const out = new Map<string, [number, number]>()
+  const used = new Set<string>()
+  for (const e of employees) {
+    if (used.has(e.user.id)) continue
+    const group = [e]
+    used.add(e.user.id)
+    for (const o of employees) {
+      if (used.has(o.user.id)) continue
+      if (metersBetween(e.current.latitude, e.current.longitude, o.current.latitude, o.current.longitude) <= CLUSTER_RADIUS_M) {
+        group.push(o)
+        used.add(o.user.id)
+      }
+    }
+    if (group.length === 1) {
+      out.set(e.user.id, [e.current.latitude, e.current.longitude])
+      continue
+    }
+    const cLat = group.reduce((s, g) => s + g.current.latitude, 0) / group.length
+    const cLng = group.reduce((s, g) => s + g.current.longitude, 0) / group.length
+    const cosLat = Math.cos((cLat * Math.PI) / 180) || 1
+    group.forEach((g, i) => {
+      const ang = (2 * Math.PI * i) / group.length
+      out.set(g.user.id, [cLat + FAN_RADIUS_DEG * Math.cos(ang), cLng + (FAN_RADIUS_DEG * Math.sin(ang)) / cosLat])
+    })
+  }
+  return out
+}
+
 // A marker that glides smoothly to each new position (Swiggy-style) instead of
 // jumping — it interpolates lat/lng over ~1.4s whenever the target changes.
 function AnimatedMarker({
@@ -123,12 +168,26 @@ function FollowMap({ employees }: { employees: LiveEmployee[] }) {
   return null
 }
 
+// Fly the map to a chosen employee when the admin clicks them in the side list.
+function FocusEmployee({ id, positions }: { id?: string | null; positions: Map<string, [number, number]> }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!id) return
+    const pos = positions.get(id)
+    if (pos) map.flyTo(pos, Math.max(map.getZoom(), 17), { duration: 0.8 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
+  return null
+}
+
 export default function LiveTrackingMap({
   employees,
   areas = {},
+  focusId,
 }: {
   employees: LiveEmployee[]
   areas?: Record<string, string>
+  focusId?: string | null
 }) {
   const fallbackCenter: [number, number] = employees[0]
     ? [employees[0].current.latitude, employees[0].current.longitude]
@@ -143,6 +202,9 @@ export default function LiveTrackingMap({
     return m
   }, [employees])
 
+  // Fan out employees who share a location so each pin stays identifiable.
+  const displayPositions = useMemo(() => fanOutPositions(employees), [employees])
+
   return (
     <MapContainer center={fallbackCenter} zoom={16} scrollWheelZoom style={{ height: "100%", width: "100%" }}>
       {/* Standard OpenStreetMap tiles — free, no API key required */}
@@ -152,10 +214,12 @@ export default function LiveTrackingMap({
         maxZoom={19}
       />
       <FollowMap employees={employees} />
+      <FocusEmployee id={focusId} positions={displayPositions} />
 
       {employees.map((e) => {
         const meta = STATUS_META[e.status]
         const pos: [number, number] = [e.current.latitude, e.current.longitude]
+        const displayPos: [number, number] = displayPositions.get(e.user.id) ?? pos
         const rawTrail = e.trail.map((p) => [p.latitude, p.longitude]) as [number, number][]
         const trailPts = smoothPath(rawTrail)
         // Accuracy circle marks the area the employee is standing in (like the
@@ -183,7 +247,15 @@ export default function LiveTrackingMap({
               radius={accuracyRadius}
               pathOptions={{ color: meta.color, weight: 1, fillColor: meta.color, fillOpacity: 0.15 }}
             />
-            <AnimatedMarker position={pos} icon={icons.get(e.user.id)}>
+            {/* If this pin was fanned away from the real spot (shared location),
+                draw a thin leg back to the true position so it stays clear. */}
+            {displayPos[0] !== pos[0] || displayPos[1] !== pos[1] ? (
+              <Polyline
+                positions={[pos, displayPos]}
+                pathOptions={{ color: meta.color, weight: 1.5, opacity: 0.5, dashArray: "3 4" }}
+              />
+            ) : null}
+            <AnimatedMarker position={displayPos} icon={icons.get(e.user.id)}>
               <Popup>
                 <div style={{ minWidth: 180 }}>
                   <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>

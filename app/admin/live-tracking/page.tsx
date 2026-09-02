@@ -44,6 +44,9 @@ export default function LiveTrackingPage() {
   const distanceByUser = statsData?.distanceByUser ?? {}
   const teamKm = statsData?.teamKm ?? 0
 
+  // Which employee the admin tapped in the list — the map flies to them.
+  const [focusId, setFocusId] = useState<string | null>(null)
+
   const employees = data?.employees ?? []
 
   // Resolve a human-readable area name for each live employee (cached; barely
@@ -124,7 +127,7 @@ export default function LiveTrackingPage() {
                   </p>
                 </div>
               ) : (
-                <LiveTrackingMap employees={employees} areas={areas} />
+                <LiveTrackingMap employees={employees} areas={areas} focusId={focusId} />
               )}
             </div>
           </Card>
@@ -147,9 +150,14 @@ export default function LiveTrackingPage() {
                 employees.map((e) => {
                   const meta = STATUS_META[e.status]
                   return (
-                    <div
+                    <button
                       key={e.user.id}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-violet-100 p-2"
+                      type="button"
+                      onClick={() => setFocusId(e.user.id)}
+                      title="Show on map"
+                      className={`flex w-full items-center justify-between gap-2 rounded-lg border p-2 text-left transition-colors hover:bg-violet-50 ${
+                        focusId === e.user.id ? "border-violet-400 bg-violet-50 ring-1 ring-violet-300" : "border-violet-100"
+                      }`}
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-violet-900">
@@ -191,7 +199,7 @@ export default function LiveTrackingPage() {
                           })}
                         </p>
                       </div>
-                    </div>
+                    </button>
                   )
                 })
               )}
